@@ -11,7 +11,13 @@ import {
   saveOnboardingState,
   advanceOnboardingState,
   isStepReachable,
+  loadBootChoice,
+  saveBootChoice,
+  clearBootChoice,
+  ALL_ROLES,
   type OnboardingStep,
+  type Role,
+  type BootChoice,
 } from './onboarding.ts';
 import {
   buildExploreState,
@@ -962,7 +968,78 @@ async function start(){
   await loadCellCenters();
 }
 renderOnboarding();
-action(start());
+// PR-A: Boot modal cold start. If the user has never picked a
+// role, show the modal first and let them confirm before we
+// start the simulation. Once a role is saved, every subsequent
+// cold start goes straight to `start()`.
+const bootModal = $('boot-modal') as HTMLElement;
+const bootStartBtn = $('boot-start') as HTMLButtonElement;
+const bootSkipInput = $('boot-skip-basics') as HTMLInputElement;
+const bootSkipLabel = $('boot-skip-label') as HTMLElement;
+const bootCards = document.querySelectorAll<HTMLButtonElement>('.boot-card');
+let selectedBootRole: Role | null = null;
+
+function setSelectedBootRole(role: Role | null) {
+  selectedBootRole = role;
+  for (const card of Array.from(bootCards)) {
+    const isMe = card.dataset.role === role;
+    card.classList.toggle('selected', isMe);
+    card.setAttribute('aria-checked', String(isMe));
+  }
+  bootStartBtn.disabled = role === null;
+  // "Skip basics" is only meaningful for users old enough to
+  // grasp planet-level inputs. Elementary students always
+  // walk the full 5 steps (they need the cosmos backdrop to
+  // make the "一颗星球" framing land).
+  const skipEnabled = role !== null && role !== 'elementary';
+  bootSkipInput.disabled = !skipEnabled;
+  bootSkipLabel.classList.toggle('disabled', !skipEnabled);
+  if (!skipEnabled) bootSkipInput.checked = false;
+}
+
+for (const card of Array.from(bootCards)) {
+  card.addEventListener('click', () => {
+    const r = card.dataset.role as Role | undefined;
+    if (r && (ALL_ROLES as readonly string[]).includes(r)) setSelectedBootRole(r);
+  });
+}
+
+function showBootModal() {
+  bootModal.hidden = false;
+  bootModal.setAttribute('aria-hidden', 'false');
+  setSelectedBootRole(null);
+  bootSkipInput.checked = false;
+}
+
+function hideBootModal() {
+  bootModal.hidden = true;
+  bootModal.setAttribute('aria-hidden', 'true');
+}
+
+bootStartBtn.addEventListener('click', () => {
+  if (!selectedBootRole) return;
+  const choice: BootChoice = {
+    role: selectedBootRole,
+    skipBasics: bootSkipInput.checked,
+    chosenAtMs: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+  };
+  saveBootChoice(choice);
+  hideBootModal();
+  // Kick off the planet simulation now that we know who we're
+  // talking to. We don't act on `role` yet — PR-F (学段适配)
+  // wires the role into step wording + recommendation strength.
+  // The `skipBasics` flag is also dormant for now: PR-B wires
+  // it into the initial `OnboardingState.step`.
+  action(start());
+});
+
+if (loadBootChoice() === null) {
+  // First-ever cold start (or after "重新开始"). Show the modal
+  // and hold the simulation until the user confirms a role.
+  showBootModal();
+} else {
+  action(start());
+}
 function updateBranches(d:Projection){
   for(const selectId of ['branch-select','compare-a','compare-b']){
     const select=$<HTMLSelectElement>(selectId),before=select.value;
@@ -1113,8 +1190,13 @@ onboardingNext.addEventListener('click', () => {
 onboardingReset.addEventListener('click', () => {
   if (!confirm('重置到第 1 步？已完成进度会清空。')) return;
   onboarding = { step: 1, completedSteps: [], finishedAtMs: null };
+  // PR-A: also clear the boot choice so the next cold start
+  // re-asks "你是哪种读者?" rather than auto-resuming a
+  // role that the user explicitly just reset past.
+  clearBootChoice();
   persistOnboarding();
   renderOnboarding();
+  showBootModal();
 });
 
 // Step CTAs: open the matching dialog but keep the stage visible

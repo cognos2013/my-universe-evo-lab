@@ -22,11 +22,18 @@ import {
   saveOnboardingState,
   advanceOnboardingState,
   isStepReachable,
+  loadBootChoice,
+  saveBootChoice,
+  clearBootChoice,
   STEP_META,
   ALL_ONBOARDING_STEPS,
+  ALL_ROLES,
+  ROLE_META,
+  BOOT_STORAGE_KEY,
   DEFAULT_ONBOARDING_STATE,
   type OnboardingState,
   type OnboardingStep,
+  type BootChoice,
 } from '../src/app/onboarding.ts';
 
 // === Storage shim ====================================================
@@ -171,4 +178,110 @@ test('STEP_META covers all 5 steps with required fields', () => {
 
 test('ALL_ONBOARDING_STEPS lists 1—5 in order', () => {
   assert.deepEqual([...ALL_ONBOARDING_STEPS], [1, 2, 3, 4, 5]);
+});
+
+// === PR-A: Boot choice (role / skipBasics) ===========================
+
+test('loadBootChoice: cold start returns null', () => {
+  installStorageShim();
+  try {
+    assert.equal(loadBootChoice(), null);
+  } finally { restoreStorage(); }
+});
+
+test('saveBootChoice → loadBootChoice round-trip preserves all fields', () => {
+  installStorageShim();
+  try {
+    const original: BootChoice = {
+      role: 'middle',
+      skipBasics: true,
+      chosenAtMs: 1234.5,
+    };
+    saveBootChoice(original);
+    const back = loadBootChoice();
+    assert.ok(back, 'boot choice should round-trip');
+    assert.equal(back!.role, 'middle');
+    assert.equal(back!.skipBasics, true);
+    assert.equal(back!.chosenAtMs, 1234.5);
+  } finally { restoreStorage(); }
+});
+
+test('saveBootChoice uses the namespaced storage key', () => {
+  installStorageShim();
+  try {
+    saveBootChoice({ role: 'high', skipBasics: false, chosenAtMs: 0 });
+    assert.equal(shim.data.has(BOOT_STORAGE_KEY), true);
+  } finally { restoreStorage(); }
+});
+
+test('loadBootChoice: unknown role falls back to null', () => {
+  installStorageShim();
+  try {
+    shim.data.set(BOOT_STORAGE_KEY, JSON.stringify({
+      role: 'principal', // not in the Role union
+      skipBasics: false,
+      chosenAtMs: 0,
+    }));
+    assert.equal(loadBootChoice(), null);
+  } finally { restoreStorage(); }
+});
+
+test('loadBootChoice: non-boolean skipBasics falls back to null', () => {
+  installStorageShim();
+  try {
+    shim.data.set(BOOT_STORAGE_KEY, JSON.stringify({
+      role: 'elementary',
+      skipBasics: 'yes', // wrong type
+      chosenAtMs: 0,
+    }));
+    assert.equal(loadBootChoice(), null);
+  } finally { restoreStorage(); }
+});
+
+test('loadBootChoice: missing chosenAtMs falls back to null', () => {
+  installStorageShim();
+  try {
+    shim.data.set(BOOT_STORAGE_KEY, JSON.stringify({
+      role: 'teacher',
+      skipBasics: false,
+      // chosenAtMs omitted
+    }));
+    assert.equal(loadBootChoice(), null);
+  } finally { restoreStorage(); }
+});
+
+test('loadBootChoice: corrupt JSON falls back to null', () => {
+  installStorageShim();
+  try {
+    shim.data.set(BOOT_STORAGE_KEY, '{not json');
+    assert.equal(loadBootChoice(), null);
+  } finally { restoreStorage(); }
+});
+
+test('clearBootChoice removes the persisted entry', () => {
+  installStorageShim();
+  try {
+    saveBootChoice({ role: 'elementary', skipBasics: false, chosenAtMs: 1 });
+    assert.ok(loadBootChoice());
+    clearBootChoice();
+    assert.equal(loadBootChoice(), null);
+    assert.equal(shim.data.has(BOOT_STORAGE_KEY), false);
+  } finally { restoreStorage(); }
+});
+
+test('ALL_ROLES lists all four roles in fixed order', () => {
+  assert.deepEqual([...ALL_ROLES], ['elementary', 'middle', 'high', 'teacher']);
+});
+
+test('ROLE_META covers every role with non-empty fields', () => {
+  for (const role of ALL_ROLES) {
+    const meta = ROLE_META[role];
+    assert.ok(meta, `role ${role} must have a meta entry`);
+    assert.equal(typeof meta.label, 'string');
+    assert.ok(meta.label.length > 0);
+    assert.equal(typeof meta.tagline, 'string');
+    assert.ok(meta.tagline.length > 0);
+    assert.equal(typeof meta.audience, 'string');
+    assert.ok(meta.audience.length > 0);
+  }
 });

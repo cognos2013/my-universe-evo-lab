@@ -26,6 +26,125 @@ export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 
 export const ALL_ONBOARDING_STEPS: readonly OnboardingStep[] = [1, 2, 3, 4, 5] as const;
 
+/**
+ * PR-A — Boot choice (role / skipBasics).
+ *
+ * The cold-start onboarding now begins with a *role* selection so
+ * that downstream panels (PR-F, 学段适配) can tailor wording,
+ * skipped steps, and recommendation strength. The role is shown
+ * once per browser, persisted in `localStorage`, and the user can
+ * re-pick via the existing "重新开始" button (which also clears
+ * the onboarding state).
+ *
+ * Storage layout:
+ *   - `my-universe-boot-v1` → `BootChoice` JSON, or absent
+ *
+ * The `OnboardingState` is intentionally NOT extended — boot lives
+ * in its own slot so the 5-step wizard keeps a stable schema and
+ * old localStorage payloads keep loading. Future PR-F will read
+ * `loadBootChoice()` to seed the initial `OnboardingState.step`.
+ */
+export type Role = 'elementary' | 'middle' | 'high' | 'teacher';
+
+export const ALL_ROLES: readonly Role[] = ['elementary', 'middle', 'high', 'teacher'] as const;
+
+/** Human-readable role label (zh-CN). Used in the modal and
+ *  (later) in the "step 0" eyebrow of the wizard. */
+export const ROLE_META: Record<Role, { label: string; tagline: string; audience: string }> = {
+  elementary: {
+    label: '小学生',
+    tagline: '看个故事,不必纠结公式',
+    audience: '小学 5—6 年级 · 直观体验',
+  },
+  middle: {
+    label: '初中生',
+    tagline: '跟着走完一遍流程',
+    audience: '初中 · 系统化观察',
+  },
+  high: {
+    label: '高中生',
+    tagline: '对照现实数据自己推理',
+    audience: '高中 · 探究与挑战',
+  },
+  teacher: {
+    label: '老师',
+    tagline: '准备课堂演示 + 学生挑战',
+    audience: '教师 · 教学场景',
+  },
+};
+
+export interface BootChoice {
+  /** Selected role. */
+  role: Role;
+  /** When true, the user has asked to skip the cosmos / galaxy
+   *  steps (steps 1—3) on the next cold start and jump straight
+   *  to "create a planet" (step 4). Honoured only for `middle`,
+   *  `high`, and `teacher` roles — `elementary` always walks
+   *  the full 5 steps. */
+  skipBasics: boolean;
+  /** `performance.now()` at the moment the user confirmed. */
+  chosenAtMs: number;
+}
+
+export const BOOT_STORAGE_KEY = 'my-universe-boot-v1';
+
+function isRole(v: unknown): v is Role {
+  return v === 'elementary' || v === 'middle' || v === 'high' || v === 'teacher';
+}
+
+/** A boot choice is considered "valid" only if the role is one
+ *  of the four known values. `skipBasics` must be a boolean. */
+function sanitiseBoot(raw: unknown): BootChoice | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (!isRole(o.role)) return null;
+  if (typeof o.skipBasics !== 'boolean') return null;
+  if (typeof o.chosenAtMs !== 'number') return null;
+  return {
+    role: o.role,
+    skipBasics: o.skipBasics,
+    chosenAtMs: o.chosenAtMs,
+  };
+}
+
+/**
+ * Read the persisted boot choice. Returns `null` on a cold start,
+ * on parse failure, when `localStorage` is unavailable, or when
+ * the stored shape is invalid (e.g. role typo).
+ */
+export function loadBootChoice(): BootChoice | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BOOT_STORAGE_KEY);
+    if (raw === null) return null;
+    return sanitiseBoot(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a boot choice. No-op when `localStorage` is unavailable. */
+export function saveBootChoice(choice: BootChoice): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(BOOT_STORAGE_KEY, JSON.stringify(choice));
+  } catch {
+    // Quota / private mode: silently drop. The choice stays in
+    // memory for the current session, just not across reloads.
+  }
+}
+
+/** Remove the persisted boot choice. Used by the "重新开始"
+ *  button so the next cold start re-shows the role modal. */
+export function clearBootChoice(): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(BOOT_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface OnboardingState {
   /** Current step (1—5). The progress bar highlights this dot. */
   step: OnboardingStep;

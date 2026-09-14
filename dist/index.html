@@ -1,10 +1,51 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#080e17"/><meta name="description" content="观察生命，改变条件，探索一颗星球的不同历史。"/><title>我的宇宙 · 演化实验室</title>  <script type="module" crossorigin src="/assets/index-35fAJU92.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BkXAY6Ej.css">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#080e17"/><meta name="description" content="观察生命，改变条件，探索一颗星球的不同历史。"/><title>我的宇宙 · 演化实验室</title>  <script type="module" crossorigin src="/assets/index-Do7PvqLM.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-PWraQKQi.css">
 </head>
 <body>
   <header><a class="brand" href="/" aria-label="我的宇宙首页"><span class="brand-mark">◉</span><span>我的宇宙<small>UNIVERSE LAB</small></span></a><div class="header-center"><span class="live-dot"></span>行星演化实验室 <span class="badge">自由演化</span></div><div class="header-actions"><button id="save" class="text-button">保存</button><button id="export" class="text-button">导出</button><button id="import" class="text-button">导入</button><button id="new-world" class="button secondary">＋ 新建世界</button><button id="explore-toggle-header" class="button secondary" type="button" title="展开 / 折叠探索侧栏" aria-label="展开 / 折叠探索侧栏">EXPLORE ◀</button></div><input id="import-file" type="file" accept=".json,application/json" hidden/></header>
+  <section id="boot-modal" class="boot-modal" hidden role="dialog" aria-modal="true" aria-labelledby="boot-title">
+    <div class="boot-modal-card">
+      <div class="boot-modal-eyebrow">START HERE / 第 0 步</div>
+      <h1 id="boot-title" class="boot-modal-title">你是哪种读者?</h1>
+      <p class="boot-modal-sub">挑一个身份,我们按这个节奏带你看完整颗星球的演化。</p>
+      <div class="boot-roles" role="radiogroup" aria-labelledby="boot-title">
+        <button class="boot-card" type="button" data-role="elementary" role="radio" aria-checked="false">
+          <div class="boot-card-eyebrow">小学 5—6 年级</div>
+          <div class="boot-card-label">小学生</div>
+          <div class="boot-card-tagline">看个故事,不必纠结公式</div>
+          <div class="boot-card-audience">直观体验</div>
+        </button>
+        <button class="boot-card" type="button" data-role="middle" role="radio" aria-checked="false">
+          <div class="boot-card-eyebrow">初中</div>
+          <div class="boot-card-label">初中生</div>
+          <div class="boot-card-tagline">跟着走完一遍流程</div>
+          <div class="boot-card-audience">系统化观察</div>
+        </button>
+        <button class="boot-card" type="button" data-role="high" role="radio" aria-checked="false">
+          <div class="boot-card-eyebrow">高中</div>
+          <div class="boot-card-label">高中生</div>
+          <div class="boot-card-tagline">对照现实数据自己推理</div>
+          <div class="boot-card-audience">探究与挑战</div>
+        </button>
+        <button class="boot-card" type="button" data-role="teacher" role="radio" aria-checked="false">
+          <div class="boot-card-eyebrow">教师</div>
+          <div class="boot-card-label">老师</div>
+          <div class="boot-card-tagline">准备课堂演示 + 学生挑战</div>
+          <div class="boot-card-audience">教学场景</div>
+        </button>
+      </div>
+      <label class="boot-skip" id="boot-skip-label">
+        <input id="boot-skip-basics" type="checkbox" disabled/>
+        <span>跳过宇宙与星系,直接到"建立行星"</span>
+      </label>
+      <div class="boot-actions">
+        <button id="boot-start" class="button primary" type="button" disabled>开始 →</button>
+      </div>
+      <p class="boot-note muted small">身份只存在你这台电脑上(<code>localStorage</code>)。以后想换身份,点顶部"重新开始"。</p>
+    </div>
+  </section>
   <nav id="onboarding-progress" class="onboarding-progress" aria-label="认知步骤">
     <ol class="onboarding-steps">
       <li class="onboarding-step-item" data-step="1"><button class="onboarding-dot" data-step="1" type="button" aria-label="第 1 步 · 宇宙"><span class="onboarding-dot-num">1</span><span class="onboarding-dot-label">宇宙</span></button></li>
