@@ -1,0 +1,23 @@
+# Build artifacts (committed manually as a baseline)
+node_modules/
+.vite/
+*.tsbuildinfo
+.DS_Store
+
+# Test outputs
+coverage/
+.nyc_output/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# User-specific
+*.log
+.env
+.env.local

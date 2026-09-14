@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#080e17"/><meta name="description" content="观察生命，改变条件，探索一颗星球的不同历史。"/><title>我的宇宙 · 演化实验室</title>  <script type="module" crossorigin src="/assets/index-35fAJU92.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BkXAY6Ej.css">
+</head>
+<body>
+  <header><a class="brand" href="/" aria-label="我的宇宙首页"><span class="brand-mark">◉</span><span>我的宇宙<small>UNIVERSE LAB</small></span></a><div class="header-center"><span class="live-dot"></span>行星演化实验室 <span class="badge">自由演化</span></div><div class="header-actions"><button id="save" class="text-button">保存</button><button id="export" class="text-button">导出</button><button id="import" class="text-button">导入</button><button id="new-world" class="button secondary">＋ 新建世界</button><button id="explore-toggle-header" class="button secondary" type="button" title="展开 / 折叠探索侧栏" aria-label="展开 / 折叠探索侧栏">EXPLORE ◀</button></div><input id="import-file" type="file" accept=".json,application/json" hidden/></header>
+  <nav id="onboarding-progress" class="onboarding-progress" aria-label="认知步骤">
+    <ol class="onboarding-steps">
+      <li class="onboarding-step-item" data-step="1"><button class="onboarding-dot" data-step="1" type="button" aria-label="第 1 步 · 宇宙"><span class="onboarding-dot-num">1</span><span class="onboarding-dot-label">宇宙</span></button></li>
+      <li class="onboarding-step-item" data-step="2"><button class="onboarding-dot" data-step="2" type="button" aria-label="第 2 步 · 星系"><span class="onboarding-dot-num">2</span><span class="onboarding-dot-label">星系</span></button></li>
+      <li class="onboarding-step-item" data-step="3"><button class="onboarding-dot" data-step="3" type="button" aria-label="第 3 步 · 恒星"><span class="onboarding-dot-num">3</span><span class="onboarding-dot-label">恒星</span></button></li>
+      <li class="onboarding-step-item" data-step="4"><button class="onboarding-dot" data-step="4" type="button" aria-label="第 4 步 · 行星"><span class="onboarding-dot-num">4</span><span class="onboarding-dot-label">行星</span></button></li>
+      <li class="onboarding-step-item" data-step="5"><button class="onboarding-dot" data-step="5" type="button" aria-label="第 5 步 · 演化"><span class="onboarding-dot-num">5</span><span class="onboarding-dot-label">演化</span></button></li>
+    </ol>
+    <button id="onboarding-reset" class="text-button onboarding-reset" type="button" title="重置到第 1 步">重新开始</button>
+  </nav>
+  <section id="cosmos-dialog" class="explore-stage-panel" data-explore="cosmos"><div class="panel-heading"><div><div class="eyebrow">COSMIC BACKGROUND / LARGE SCALE</div><h2>宇宙正在怎样变化？</h2></div><button id="close-cosmos" class="text-button" aria-label="关闭宇宙总览">← 返回行星</button></div>
+    <p class="muted">平坦 ΛCDM 简化背景模型 · 拖动旋转，滚轮缩放。光点是随空间膨胀的示踪点，不是实测星系。</p>
+    <div class="cosmos-layout"><div><canvas id="cosmos-canvas" role="img" aria-label="宇宙物质示踪点膨胀示意"></canvas><p class="muted small">有限共动采样盒，不代表宇宙边界。未计算引力聚集、星系形成或恒星演化。</p></div>
+    <section class="cosmos-stats"><span class="badge">可计算的宇宙背景</span><h3 id="cosmos-time"></h3><dl><dt>尺度因子 a（现今 = 1）</dt><dd id="cosmos-scale"></dd><dt>膨胀率 H（km/s/Mpc）</dt><dd id="cosmos-hubble"></dd><dt>平均物质密度 / 现今</dt><dd id="cosmos-density"></dd><dt>物质占总能量密度</dt><dd id="cosmos-matter"></dd><dt>暗能量占总能量密度</dt><dd id="cosmos-lambda"></dd></dl><button id="cosmos-planet" class="button primary">进入当前生命星球 →</button><p class="muted small">同步模式每步推进一个生态日，宇宙背景使用相同经过时间；天文坐标和恒星辐射尚未耦合。</p></section></div>
+    <label><input id="cosmos-linked" type="checkbox" checked/> 同步推进星球（每步 1 日）</label><p id="cosmos-sync-status" class="muted small" aria-live="polite"></p><label for="cosmos-age">快速背景浏览 · 取消同步后可调整亿年尺度</label><input id="cosmos-age" type="range" min="0.1" max="30" step="any"/>
+    <div class="cosmos-controls"><button id="cosmos-play" class="button secondary">▶ 推进宇宙背景</button><button id="open-galaxies" class="button primary">星系与恒星实验 →</button><button id="open-prebiotic" class="button secondary">化学与聚落实验 →</button><button id="open-cognition" class="button secondary">智能行为实验 →</button><button id="open-settlement" class="button secondary">聚落与文明 →</button><button id="open-earth" class="button secondary">地球校准 →</button><button id="open-batch" class="button secondary">多种子批量 →</button><button id="open-v14" class="button secondary">3D 视觉实验 →</button><button id="cosmos-now" class="text-button">返回模型现今</button></div>
+    <details class="model-notes"><summary>模型范围与参数来源</summary><p>H₀ = 67.4 km/s/Mpc，Ωm = 0.315，ΩΛ = 0.685。采用无压物质与宇宙常数的解析膨胀解，忽略辐射、曲率和结构形成。1 亿年以前不开放；模型现今约 138 亿年。未来是固定参数下的情景外推。</p><p><a href="https://www.aanda.org/articles/aa/abs/2020/09/aa33910-18/aa33910-18.html" target="_blank" rel="noopener noreferrer">Planck 2018 VI · 参数来源 ↗</a> · <a href="https://www.astro.ucla.edu/~wright/cosmo_03.htm" target="_blank" rel="noopener noreferrer">UCLA · 膨胀背景说明 ↗</a></p></details>
+  </section>
+  <section id="galaxy-dialog" class="explore-stage-panel" data-explore="galaxy"><div class="panel-heading"><div><div class="eyebrow">GRAVITY &amp; GALAXY ASSEMBLY / P10B</div><h2>从气体，到第一代恒星群。</h2></div><button id="close-galaxies" class="text-button" aria-label="关闭星系实验">← 返回行星</button></div>
+  <p class="muted">局部孤立气体晕系统：引力聚集、受束缚近邻合并，以及热气体冷却、恒星形成与回流。初始气体晕是预置条件。</p>
+  <h3 id="galaxy-age"></h3><p id="galaxy-summary"></p><div class="galaxy-layout"><div id="galaxy-map" aria-label="可选择的气体晕示意图"></div><section><label for="galaxy-select">选择气体晕</label><select id="galaxy-select" aria-label="选择气体晕"></select><div id="galaxy-detail" aria-label="选中气体晕状态"></div></section></div>
+  <p id="gravity-summary" class="muted small"></p><button id="enable-gravity" class="button secondary" hidden>从当前状态启用引力装配</button><details><summary>查看合并记录</summary><div id="gravity-events"></div></details><p id="galaxy-flux" class="muted small"></p><div class="galaxy-controls"><button data-galaxy-steps="1" class="button secondary">前进 500 万年</button><button data-galaxy-steps="20" class="button primary">前进 1 亿年</button><button data-galaxy-steps="100" class="button secondary">前进 5 亿年</button><button id="stop-galaxies" class="text-button">停止</button></div><p id="galaxy-status" role="status"></p>
+  <p class="muted small">独立的深时间实验，整个实验文件共享一份天体状态，不按生态分支复制。它不跳算星球的亿年生态历史；恒星群不是逐颗恒星；位置是孤立系统中的物理 kpc 坐标，XY 投影随视野范围缩放，不是实测星图。M☉ 为太阳质量，L☉ 为太阳光度。</p>
+  <details class="model-notes"><summary>机制、参数与边界</summary><p>预置 8 个气体晕，起点 1 亿年；恒星步长 5 百万年，引力子步 0.05 Myr，Plummer 软化 0.5 kpc。近邻在 1 kpc 内、相互接近且受束缚时采用简化非弹性合并，合并角动量和能量进入内部账。这是局部孤立系统，不叠加哈勃流。冷却为指数转移，恒星形成耗时参数为 20 亿年；三个质量档及其寿命、回流比例、光度均为教学设计值，未经过观测校准。核聚变质量亏损、金属元素、反馈风和恒星辐射对行星的影响尚未实现。</p><p><a href="https://science.nasa.gov/universe/stars/" target="_blank" rel="noopener noreferrer">NASA 恒星生命周期</a> · <a href="https://science.nasa.gov/mission/webb/galaxies-over-time/" target="_blank" rel="noopener noreferrer">NASA 星系演化</a></p></details></section>
+  <section id="prebiotic-dialog" class="explore-stage-panel" data-explore="chemistry"><div class="panel-heading"><div><div class="eyebrow">PRE-LIFE CHEMISTRY &amp; COLONIAL ORGANISMS / P12 + P13</div><h2>化学反应网络 · 多细胞聚落</h2></div><button id="close-prebiotic" class="text-button" aria-label="关闭化学与聚落实验">← 返回行星</button></div>
+    <p class="muted">化学反应网络是行星表面生命出现前的简化反应器；多细胞聚落把同区域同形状的多个生命队列聚成一个新选择单元。两套子系统都借用星球的外部能量池（受星震与银河 SN 影响）。</p>
+    <div class="prebiotic-layout">
+      <section class="prebiotic-chem">
+        <h3>化学反应网络（P12）</h3>
+        <label>反应网络 JSON（<span class="muted small">点击下方"载入示例"填入起点</span>）<textarea id="chem-network" rows="10" spellcheck="false" aria-label="反应网络 JSON"></textarea></label>
+        <div class="prebiotic-row">
+          <button id="chem-load-sample" class="text-button" type="button">载入示例网络</button>
+          <button id="chem-load" class="button secondary" type="button">加载网络</button>
+          <button id="chem-step" class="button primary" type="button">推进 1 步</button>
+        </div>
+        <p id="chem-status" class="muted small" role="status">尚未加载反应网络。</p>
+        <h4>物种浓度</h4>
+        <ul id="chem-concentrations" class="prebiotic-list"></ul>
+      </section>
+      <section class="prebiotic-colonies">
+        <h3>多细胞聚落（P13）</h3>
+        <div class="prebiotic-row">
+          <label>最小成员数 <input id="col-min-members" type="number" value="2" min="1" max="32" step="1"/></label>
+          <label>分裂阈值 <input id="col-fission-members" type="number" value="8" min="2" max="64" step="1"/></label>
+          <label>每成员维护费（J）<input id="col-maintenance" type="number" value="1" min="0" max="1000" step="any"/></label>
+        </div>
+        <div class="prebiotic-row">
+          <button id="col-load" class="button secondary" type="button">扫描世界并形成聚落</button>
+          <button id="col-maintain" class="button primary" type="button">维护 1 步</button>
+        </div>
+        <p id="col-status" class="muted small" role="status">尚未加载聚落。</p>
+        <h4>当前聚落</h4>
+        <ul id="col-list" class="prebiotic-list"></ul>
+      </section>
+    </div>
+    <details class="model-notes"><summary>机制、参数与边界</summary><p>化学部分：deteministic mass-action reaction reactor，爆热反应从 <code>ledger.externalEnergyInJ</code> 抽能源。能量不足时该步不发反应。连续多步浓度低于阈值会报告 <code>failed</code>；UI 不会自动"拕珩"生命，符合 P12 exit gate。</p><p>聚落部分：同区域同性状的多个生命队列会按 <code>canAdhere</code> 贴附并组成新选择单元。聚落独立维护，维护费不足时聚落解散但成员队列仍独立存活。两个子系统不修改行星账本，仅消费外部能量池。</p><p>网络是预置的，不是 GARD / Markov-state。能量仅依赖外部池，不包含表面紫外/热源估计。</p></details>
+  </section>
+  <section id="onboarding-stage" class="onboarding-stage" aria-label="认知阶段主屏">
+    <div class="onboarding-stage-inner">
+      <article class="onboarding-panel" data-step="1">
+        <div class="onboarding-hero">
+          <div class="eyebrow" id="onboarding-eyebrow-1">STEP 1 / COSMOS</div>
+          <h1 class="onboarding-title" id="onboarding-title-1">从一个宇宙开始</h1>
+          <p class="onboarding-body" id="onboarding-body-1">平坦 ΛCDM 简化背景 · H₀ = 67.4 km/s/Mpc · Ωm = 0.315 · ΩΛ = 0.685。点击下方"看宇宙背景"先观察 138 亿年尺度上的大尺度结构 —— 这里不计算引力聚集或恒星演化，只是空间膨胀的示意。</p>
+          <div class="onboarding-cta">
+            <button id="onboarding-cta-1" class="button primary" type="button">看宇宙背景</button>
+            <button class="onboarding-skip button secondary" type="button" data-action="cosmos">在面板中打开</button>
+          </div>
+          <p class="onboarding-note muted small">提示：先看几个亿年的背景推进，再进入下一步。顶部进度条可点回前面的步骤。</p>
+        </div>
+      </article>
+      <article class="onboarding-panel" data-step="2" hidden>
+        <div class="onboarding-hero">
+          <div class="eyebrow" id="onboarding-eyebrow-2">STEP 2 / GALAXY</div>
+          <h1 class="onboarding-title" id="onboarding-title-2">落入一片气体云</h1>
+          <p class="onboarding-body" id="onboarding-body-2">8 个预置气体晕（孤立系统，不叠加哈勃流）。每个晕有自己的质量、坐标和 5 Myr 恒星步长。点击"看星系演化"观察坍缩 + 第一代恒星群 + 引力装配。</p>
+          <div class="onboarding-cta">
+            <button id="onboarding-cta-2" class="button primary" type="button">看星系演化</button>
+            <button class="onboarding-skip button secondary" type="button" data-action="galaxies">在面板中打开</button>
+          </div>
+          <p class="onboarding-note muted small">提示：恒星步长 5 Myr，引力子步 0.05 Myr，从 1 亿年开始；可前进 1 亿年观察装配。</p>
+        </div>
+      </article>
+      <article class="onboarding-panel" data-step="3" hidden>
+        <div class="onboarding-hero">
+          <div class="eyebrow" id="onboarding-eyebrow-3">STEP 3 / STAR &amp; PLANET</div>
+          <h1 class="onboarding-title" id="onboarding-title-3">选一颗恒星 + 周围行星</h1>
+          <p class="onboarding-body" id="onboarding-body-3">P10 阶段为教学简化：恒星用三个质量档（0.1 / 1 / 10 M☉）与寿命 / 回流 / 光度教学值，并未观测校准。点击"选恒星系统"查看预置 8 个气体晕里恒星群分布；下一步才会进入行星初始化。</p>
+          <div class="onboarding-cta">
+            <button id="onboarding-cta-3" class="button primary" type="button">选恒星系统</button>
+            <button class="onboarding-skip button secondary" type="button" data-action="galaxies">在面板中打开</button>
+          </div>
+          <p class="onboarding-note muted small">提示：恒星位置是孤立系统中的物理 kpc 坐标，XY 投影随视野范围缩放，不是实测星图。</p>
+        </div>
+      </article>
+      <article class="onboarding-panel" data-step="4" hidden>
+        <div class="onboarding-hero onboarding-hero-form">
+          <div class="eyebrow" id="onboarding-eyebrow-4">STEP 4 / PLANET</div>
+          <h1 class="onboarding-title" id="onboarding-title-4">创造一颗类地行星</h1>
+          <p class="onboarding-body" id="onboarding-body-4">选择场景、种子、初始温度和观察精度。场景决定生命起点（两种生命 / 无生命 / 有限资源），种子决定可复现的演化历史。点击"建立世界"开始演化。</p>
+          <form id="onboarding-create-form" class="onboarding-form">
+            <label>实验场景<select id="onboarding-scenario" required><option value="two-lineages">两种生命，同一颗星球</option><option value="empty-planet">无生命星球</option><option value="closed-resources">有限资源，无回收</option></select></label>
+            <label>世界种子<input id="onboarding-seed" value="my-universe-demo-v1" maxlength="256" required/></label>
+            <label>初始温度（K）<input id="onboarding-initial-temperature" type="number" value="288" min="150" max="400" step="1" required/></label>
+            <label>观察精度<select id="onboarding-resolution" required><option value="320">320 区域 · 快速实验</option><option value="1280">1280 区域 · 标准</option><option value="5120" selected>5120 区域 · 精细（默认）</option><option value="20480">20480 区域 · 超精细</option></select></label>
+            <div class="onboarding-form-actions"><button class="button primary" type="submit">建立世界</button><button class="text-button onboarding-skip" type="button" data-action="create">在面板中打开</button></div>
+          </form>
+          <p class="onboarding-note muted small">提示：当前世界尚未保存时，新建将替换它。建立后自动跳到第 5 步"演化"。</p>
+        </div>
+      </article>
+    </div>
+    <footer class="onboarding-footer">
+      <button id="onboarding-prev" class="text-button" type="button" disabled>← 上一步</button>
+      <span id="onboarding-progress-label" class="muted small">第 1 步 / 5 步</span>
+      <button id="onboarding-next" class="button secondary" type="button">下一步 →</button>
+    </footer>
+  </section>
+  <main>
+    <section class="universe-view" aria-label="行星观察">
+      <div class="view-top"><div><div class="eyebrow">EXPERIMENT 01 / ORIGIN</div><h1>一颗星球，无数种可能。</h1><p>让生命开始，观察变化留下的痕迹。</p><button id="open-cosmos" class="text-button">← 宇宙总览</button>　<button id="open-history" class="text-button">浏览宇宙年表 ↗</button></div><div class="world-coordinate">本地宇宙<span id="branch-label">主时间线</span></div></div>
+      <div id="globe" aria-label="三维星球，拖动旋转，滚轮缩放，点击选择区域" role="img"></div>
+      <div id="loading" class="loading">正在建立星球初始状态…</div>
+      <nav id="level-pill" class="level-pill" hidden aria-label="当前缩放级别">
+        <button id="level-pill-up" class="level-pill-btn" type="button" title="返回上一级">← 上一级</button>
+        <span class="level-pill-label" id="level-pill-label">行星</span>
+      </nav>
+      <section id="surface-view" class="surface-view" hidden aria-label="地表 3D 视图">
+        <div class="surface-view-canvas" id="surface-canvas"></div>
+        <div class="surface-view-inner">
+          <h2>地表 3D</h2>
+          <p class="muted small">Phase 11.2-11.3：heightmap 驱动的地表网格 + biome 渐变 + 河流 + 山峰高亮。<br>叠加层（城市 / 生物 / 气候）由右上角 checkbox 控制显隐。</p>
+        </div>
+        <div class="surface-layer-toggles" role="group" aria-label="地表层显隐">
+          <label class="layer-toggle"><input type="checkbox" data-layer="settlement" checked /><span class="dot dot-settlement"></span>城市</label>
+          <label class="layer-toggle"><input type="checkbox" data-layer="biomass" checked /><span class="dot dot-biomass"></span>生物</label>
+          <label class="layer-toggle"><input type="checkbox" data-layer="weather" checked /><span class="dot dot-weather"></span>气候</label>
+          <label class="layer-toggle"><input type="checkbox" data-layer="vegetation" checked /><span class="dot dot-vegetation"></span>植被</label>
+        </div>
+      </section>
+      <div class="globe-label"><span class="live-dot"></span><span>生命星球</span><small id="cell-count">320 个观察区域</small></div>
+      <div class="layer-bar" role="group" aria-label="观察图层"><button data-layer="terrain" class="active">地表</button><button data-layer="temperature">温度</button><button data-layer="biomass">生命</button><button data-layer="nutrient">营养</button><button data-layer="lineage">谱系</button></div>
+      <div class="view-footer"><span>拖动旋转 · 滚轮缩放 · 点击区域观察</span><span id="legend">海洋 <i class="legend-ocean"></i> 陆地 <i class="legend-land"></i></span></div>
+    </section>
+    <aside>
+      <div class="panel-heading"><h2>生命与环境</h2><span id="run-status" class="badge">初始化</span></div>
+      <div class="primary-stat"><span>生命个体</span><strong id="population">—</strong><small>模型种群 · 不代表真实物种</small></div>
+      <div class="stat-grid"><div><span>平均温度</span><strong id="temperature">—</strong></div><div><span>活跃谱系</span><strong id="lineages">—</strong></div><div><span>可用营养</span><strong id="nutrient">—</strong></div><div><span>谱系多样性</span><strong id="diversity">—</strong></div></div>
+      <div class="panel-section"><div class="panel-heading"><h3>正在发生</h3><span class="tiny-label">因果记录</span></div><p id="event" aria-live="polite">等待世界建立。</p><p class="muted small">环境影响存活与繁殖；生命消耗营养，并将物质重新交还星球。</p></div>
+      <div class="panel-section" id="inspection"><h3>走近一个区域</h3><p class="muted">点击星球表面，查看当地温度、资源和生命谱系。</p><button id="inspect-first" class="text-button">查看区域 0 →</button></div>
+      <details class="model-notes"><summary>这个世界依据什么运行？</summary><p>人工场景 · 简化热平衡 · 有限资源 · 无性遗传与随机变异。没有预设进化终点。</p><p>MU 是模型物质单位。本版本不模拟真实地球天气、生命起源或文明。</p><label for="lens">观察视角</label><select id="lens"><option value="science">科学机制</option><option value="wuyan">物演通论 · 依赖</option><option value="changes">易经 · 变化</option><option value="dependent">佛经 · 条件依存</option></select><p id="lens-description">依据营养、能量、遗传与环境匹配观察实际出生死亡。模型参数仍需校准。</p></details>
+    </aside>
+    <section class="timeline" aria-label="时间控制">
+      <div class="timeline-top"><div class="time-display"><span class="eyebrow">TIME SINCE ORIGIN</span><strong>第 <span id="day">0</span> 日</strong></div><div class="time-controls"><button id="open-lab" class="button secondary">干预与分支</button><button id="step" class="button secondary" disabled>前进 1 日</button><select id="duration" aria-label="推进天数"><option value="10">10 日</option><option value="100" selected>100 日</option><option value="1000">1000 日</option></select><button id="play" class="button primary" disabled>▶ 开始演化</button></div></div>
+      <div class="chart-heading"><span>生命数量的变化</span><span id="chart-end">初始时刻</span></div><svg id="history-chart" viewBox="0 0 1000 85" preserveAspectRatio="none" role="img" aria-label="生命数量随时间变化"><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5ce1c1" stop-opacity=".25"/><stop offset="100%" stop-color="#5ce1c1" stop-opacity="0"/></linearGradient></defs><path id="chart-area" fill="url(#chart-fill)"/><path id="chart-line" fill="none" stroke="#5ce1c1" stroke-width="2"/></svg>
+      <p class="muted small"><button id="refine-world" class="text-button">细分当前星球（保留历史）</button> · <span id="cohort-capacity"></span> · <button id="expand-capacity" class="text-button">扩充计算容量</button></p><p class="muted small">扩容会创建新分支并增加内存需求，保留当前世界。最高 100,000 队列。</p><p id="history-storage" class="muted small" aria-live="polite"></p><div class="timeline-labels"><span>起源</span><span id="integrity">物质收支等待校验</span><span>现在</span></div>
+      <div class="history-controls"><label for="seek">回到过去</label><input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="历史时刻"/><span id="seek-label">第 0 日</span><button id="cancel-history" class="text-button" hidden>取消恢复</button><span id="save-status" role="status">尚未保存</span></div>
+    </section>
+  </main>
+  <aside id="explore-sidebar" class="explore-sidebar" aria-label="探索侧边栏" hidden>
+    <div class="explore-header">
+      <div class="explore-header-row">
+        <span class="eyebrow">EXPLORE / P12—P17</span>
+        <label class="explore-guided-toggle" title="开启后进入面板会高亮第一个可交互元素">
+          <input id="explore-guided-toggle-input" type="checkbox"/>
+          <span class="explore-guided-toggle-label">教学模式</span>
+        </label>
+        <label class="explore-guided-toggle" title="开启后演化跑到本轮结束会自动开下一轮，无需手动再点">
+          <input id="explore-autocontinue-toggle-input" type="checkbox"/>
+          <span class="explore-guided-toggle-label">自动续跑</span>
+        </label>
+      </div>
+      <h3>探索</h3>
+      <p class="muted small">基于当前行星状态推荐下一步实验。点击进入对应面板。</p>
+    </div>
+    <div class="explore-recommend">
+      <span class="eyebrow">推荐</span>
+      <p id="explore-recommend-text" class="muted small">尚未加载任何实验</p>
+      <button id="explore-recommend-go" class="button primary" type="button" data-explore="chemistry">打开</button>
+    </div>
+    <ul id="explore-panels" class="explore-panels"></ul>
+    <div class="explore-footer">
+      <span id="explore-context" class="muted small"></span>
+    </div>
+  </aside>
+  <section id="explore-stage" class="explore-stage" aria-label="探索主区" hidden>
+    <div class="explore-stage-header">
+      <button id="explore-back" class="text-button" type="button">← 返回行星</button>
+      <span id="explore-stage-title" class="muted small">选择一个探索项开始</span>
+      <span class="explore-kbd-hint" id="explore-kbd-hint">
+        <kbd>1</kbd>—<kbd>9</kbd> 切面板
+        <kbd>R</kbd> 推荐
+        <kbd>Esc</kbd> 返回
+      </span>
+    </div>
+    <div id="explore-guided-bar" class="explore-guided-bar" hidden aria-live="polite">
+      <span class="explore-guided-step" id="explore-guided-step">1 / 1</span>
+      <span class="explore-guided-tip-text" id="explore-guided-tip-text">引导提示</span>
+      <button id="explore-guided-next" class="text-button" type="button">下一步 →</button>
+      <button id="explore-guided-skip" class="text-button" type="button" title="跳过本面板的引导">跳过</button>
+    </div>
+  </section>
+  <div id="toast" role="status" hidden></div>
+  <section id="cognition-dialog" class="explore-stage-panel" data-explore="cognition"><div class="panel-heading"><div><div class="eyebrow">PERCEPTION · LEARNING · INTELLIGENCE / P14</div><h2>智能行为 · 多任务多智能体</h2></div><button id="close-cognition" class="text-button" aria-label="关闭智能行为实验">← 返回行星</button></div>
+    <p class="muted">有限观测、能量/记忆成本、可训练策略。P14 验收门：所学策略必须在同任务上胜出随机基线。三种任务、两种策略、同步绑定主时间线自动步进。</p>
+    <div class="cognition-layout">
+      <section class="cognition-control">
+        <h3>控制面板</h3>
+        <label>任务<select id="cog-task"><option value="foraging">觅食（找最富 cell）</option><option value="thermoregulation">避热（贴近 290 K）</option><option value="aggregation">社交（同 lineage 聚集）</option></select></label>
+        <label>策略<select id="cog-policy"><option value="q-learning">表格 Q-learning</option><option value="random">随机基线</option></select></label>
+        <label>初始 ε（探索率）<input id="cog-epsilon" type="number" value="0.2" min="0" max="1" step="0.05"/></label>
+        <div class="cog-row">
+          <button id="cog-load" class="button secondary" type="button">扫描世界并生成 agents</button>
+          <button id="cog-step" class="button primary" type="button">推进 1 步</button>
+        </div>
+        <p id="cog-status" class="muted small" role="status">尚未加载。</p>
+        <details class="model-notes"><summary>任务与基线</summary><p><strong>觅食</strong>：落在全局最富 cell 立即 +50，激励 Q-learning 学会向富 cell 走。</p><p><strong>避热</strong>：贴 290 K（生物最佳温度近似）时 +50，30 K 之外归 0，模拟偏好温和环境的策略。</p><p><strong>社交</strong>：邻居 cell 上有同 lineage agent 时 +10/个，模拟聚集成群行为。</p><p>随机策略 ε=1 永不学，是验收基线；Q-learning ε 从初始 0.2 衰减到 0.02。</p></details>
+      </section>
+      <section class="cognition-stats">
+        <h3>累计状态</h3>
+        <ul id="cog-summary" class="cog-list">
+          <li><strong>agents</strong><span class="muted">—</span></li>
+          <li><strong>episode</strong><span class="muted">—</span></li>
+          <li><strong>累计 reward</strong><span class="muted">—</span></li>
+          <li><strong>累计 cognition J</strong><span class="muted">—</span></li>
+          <li><strong>当前任务</strong><span class="muted">—</span></li>
+        </ul>
+        <h4>按谱系</h4>
+        <ul id="cog-by-lineage" class="cog-list"></ul>
+        <p class="muted small">返回行星后点主界面 <em>▶ 开始演化</em>，P14 会随主 tick 自动学习（silent 模式，不污染事件流）。</p>
+      </section>
+    </div>
+  </section>
+  <section id="settlement-dialog" class="explore-stage-panel" data-explore="settlement"><div class="panel-heading"><div><div class="eyebrow">SETTLEMENTS &amp; CIVILISATIONS / P15</div><h2>聚落与文明 · 生产 / 消费 / 知识 / 衰退</h2></div><button id="close-settlement" class="text-button" aria-label="关闭聚落实验">← 返回行星</button></div>
+    <p class="muted">聚落独立于 P13 多细胞与 P14 智能体，是一个新的选择层（制度规则 + 环境反馈）。按 docs/15 P15：聚落必须以模板独立初始化，不能声称由 P12 自动演化而来。</p>
+    <div class="settlement-layout">
+      <section class="settlement-control">
+        <h3>聚落模板（独立初始化）</h3>
+        <label>聚落数<select id="set-count"><option value="2">2 个</option><option value="3" selected>3 个</option><option value="4">4 个</option></select></label>
+        <label>初始人口<select id="set-population"><option value="20">20 人</option><option value="50" selected>50 人</option><option value="100">100 人</option></select></label>
+        <label>知识起点<select id="set-knowledge"><option value="0" selected>0（无知识）</option><option value="2">2 级（已积累）</option></select></label>
+        <label>初始食物<select id="set-food"><option value="100">100</option><option value="200" selected>200</option><option value="500">500</option></select></label>
+        <h4 class="set-section">制度（P15-2）</h4>
+        <label>制度<select id="set-institution"><option value="private" selected>私有（无 bonus）</option><option value="mixed">混合（按 taxRate 共享）</option><option value="public">公共（+10% 产量）</option></select></label>
+        <label>公共税率（仅 mixed）<input id="set-taxrate" type="number" value="0.3" min="0" max="1" step="0.05"/></label>
+        <h4 class="set-section">技术（P15-2）</h4>
+        <label class="set-checkbox"><input id="set-tech-irrigation" type="checkbox"/> 灌溉（产量 ×1.25）</label>
+        <label class="set-checkbox"><input id="set-tech-granary" type="checkbox"/> 粮仓（消费 ×0.7）</label>
+        <label class="set-checkbox"><input id="set-tech-writing" type="checkbox"/> 文字（研究 ×1.5）</label>
+        <h4 class="set-section">交换（P15-2）</h4>
+        <label class="set-checkbox"><input id="set-exchange-enabled" type="checkbox"/> 启用全连接互助（每步每边 5 food）</label>
+        <h4 class="set-section">联盟与冲突（P15-3）</h4>
+        <label class="set-checkbox"><input id="set-coalition-enabled" type="checkbox"/> 启用全连接联盟（无条件共享，rate 3）</label>
+        <label class="set-checkbox"><input id="set-conflict-enabled" type="checkbox"/> 启用全连接冲突（每步 5% 伤亡，2% 人口）</label>
+        <div class="set-row">
+          <button id="set-load" class="button secondary" type="button">生成模板聚落</button>
+          <button id="set-step" class="button primary" type="button">推进 1 步</button>
+        </div>
+        <p id="set-status" class="muted small" role="status">尚未加载。</p>
+        <details class="model-notes"><summary>机制</summary><p>每步：<strong>生产</strong> = 人口 × 基础产量 × (1 + 知识倍增 × 知识等级) × 当地营养系数 · 制度 bonus · tech mult · <strong>消费</strong> = 人口 × 人均消费 × tech mult · <strong>知识</strong> 在食物 &gt; 0 时累加 · <strong>衰退</strong> 食物 &lt; 0 时人口下降，人口归零时解散。</p><p>交换：<strong>全连接</strong> 模式 = 聚落 i 援助 i+1，每步最多转 5 food，<em>仅当 source 有余且 target 缺时触发</em>（饥荒救援，不是免费午餐）。</p><p>验收门：制度/技术/交换 中任一开启后，平均寿命 ≥ baseline。</p></details>
+      </section>
+      <section class="settlement-stats">
+        <h3>累计状态</h3>
+        <ul id="set-summary" class="set-list">
+          <li><strong>settlements</strong><span class="muted">—</span></li>
+          <li><strong>step</strong><span class="muted">—</span></li>
+          <li><strong>累计生产 food</strong><span class="muted">—</span></li>
+          <li><strong>累计消费 food</strong><span class="muted">—</span></li>
+          <li><strong>累计互助 food</strong><span class="muted">—</span></li>
+          <li><strong>累计解散</strong><span class="muted">—</span></li>
+        </ul>
+        <h4>按聚落</h4>
+        <ul id="set-by-settlement" class="set-list"></ul>
+        <p class="muted small">返回行星后点主界面 <em>▶ 开始演化</em>，P15 会随主 tick 自动推进（silent 模式）。</p>
+      </section>
+    </div>
+  </section>
+  <section id="branch-dialog" class="explore-stage-panel" data-explore="branch"><div class="panel-heading"><div><div class="eyebrow">PARALLEL HISTORIES</div><h2>一个选择，另一条历史。</h2></div><button id="close-lab" class="text-button" aria-label="关闭分支面板">← 返回行星</button></div><p class="muted">每次干预都会创建新分支，你始终可以回到原来的世界。</p><div class="lab-columns"><section><h3>时间分支</h3><label>正在观察<select id="branch-select" aria-label="当前分支"></select></label><button id="fork-simple" class="button secondary">复制当前世界</button><div id="branch-list" class="branch-list"></div></section><section><h3>改变一个条件</h3><label>干预方式<select id="intervention-type"><option value="addNutrient">营养补给</option><option value="changeForcing">热量强迫</option><option value="disturbArea">局部灾变</option><option value="seedLife">播种生命</option><option value="editTraits">改变性状</option></select></label><label>作用范围<select id="intervention-scope"><option value="selected">选中区域（默认区域 0）</option><option value="all">整个星球</option></select></label><label><span id="intervention-value-label">投入营养（MU）</span><input id="intervention-value" type="number" value="1000" min="0" step="any"/></label><label id="forcing-duration-row" hidden>持续天数<input id="forcing-duration" type="number" min="1" max="10000" value="30"/></label><p id="intervention-preview" class="muted small">外部投入会记录到物质账。原时间线不改变。</p><button id="apply-intervention" class="button primary">应用并创建分支</button></section></div><section class="compare-section"><h3>对照两条历史</h3><div class="compare-controls"><select id="compare-a" aria-label="对照分支 A"></select><span>与</span><select id="compare-b" aria-label="对照分支 B"></select><select id="compare-duration" aria-label="对照推进天数"><option value="10">推进 10 日</option><option value="100">推进 100 日</option></select><button id="compare-run" class="button primary">开始对照</button><button id="cancel-operation" class="text-button" hidden>停止计算</button></div><p class="muted small">两条时间线推进至同一时刻，差值为 B − A。这是给定假设下的单次实验结果。</p><div id="comparison-result" aria-live="polite"></div></section></section>
+  <section id="history-dialog" class="explore-stage-panel" data-explore="history"><div class="panel-heading"><div><div class="eyebrow">COSMIC CHRONICLE</div><h2>从宇宙的开端，到未定的未来。</h2></div><button id="close-history" class="text-button" aria-label="关闭宇宙年表">← 返回行星</button></div><p class="muted">这是知识导览。当前可运行的是生态自由实验，历史时期不能直接加载为真实世界。</p><div class="chronicle"><nav id="history-entries" aria-label="宇宙历史时期"></nav><article id="history-detail"></article></div></section>
+  <section id="batch-dialog" class="explore-stage-panel" data-explore="batch"><div class="panel-heading"><div><div class="eyebrow">SCENARIO BATCHES / P17</div><h2>多种子批量 · 失败统计 · 结果分布</h2></div><button id="close-batch" class="text-button" aria-label="关闭批量实验">← 返回行星</button></div>
+    <p class="muted">按 docs/15 P17：有版本的驱动假设 + 多种子/参数组合 + 失败统计 + 结果分布。Phase 1 支持 empty-planet / two-lineages 两种 scenario，seed 数 1—64，每 seed 跑指定 tick 收集 population / 温度 / 谱系数分布。</p>
+    <div class="batch-layout">
+      <section class="batch-control">
+        <h3>运行批量</h3>
+        <label>Scenario<select id="batch-scenario"><option value="empty-planet">empty-planet（无生命）</option><option value="two-lineages">two-lineages（两种生命）</option></select></label>
+        <label>分辨率<select id="batch-resolution"><option value="320">320 区域（快）</option><option value="1280" selected>1280 区域（标准）</option></select></label>
+        <label>每 seed 步数<input id="batch-ticks" type="number" value="50" min="1" max="2000" step="1"/></label>
+        <label>Seed 数<input id="batch-seeds" type="number" value="4" min="1" max="64" step="1"/></label>
+        <label>Seed 起点<input id="batch-seed-start" type="number" value="0" min="0" max="10000" step="1"/></label>
+        <div class="batch-row">
+          <button id="batch-run" class="button primary" type="button">运行批量</button>
+        </div>
+        <p id="batch-status" class="muted small" role="status">尚未运行批量。</p>
+        <details class="model-notes"><summary>验收门</summary><p>docs/15 P17：<em>"优于透明基线才声明预测技能"</em>。这里 baseline = <strong>多种子结果分布</strong>（p5 / p50 / p95 区间），要求：1) 不同 seed 产出非平凡分布（std &gt; 0 或 p95−p5 &gt; 0）；2) 失败 seed 计入 failures 不污染 summary；3) 报告随 book 持久化。</p></details>
+      </section>
+      <section class="batch-stats">
+        <h3>最近一次报告</h3>
+        <ul id="batch-summary" class="batch-list">
+          <li><strong>Scenario</strong><span class="muted">—</span></li>
+          <li><strong>Seed 范围</strong><span class="muted">—</span></li>
+          <li><strong>完成 / 失败 / 崩溃</strong><span class="muted">—</span></li>
+        </ul>
+        <h4>population 分布</h4>
+        <ul id="batch-pop" class="batch-list"></ul>
+        <h4>temperature 分布</h4>
+        <ul id="batch-temp" class="batch-list"></ul>
+        <h4>lineages 分布</h4>
+        <ul id="batch-lin" class="batch-list"></ul>
+        <h4>Per-seed 结果（前 16 条）</h4>
+        <ul id="batch-per-seed" class="batch-list"></ul>
+      </section>
+    </div>
+  </section>
+  <section id="earth-dialog" class="explore-stage-panel" data-explore="earth"><div class="panel-heading"><div><div class="eyebrow">REAL-EARTH DATA &amp; CALIBRATION / P16</div><h2>地球校准 · 留出区间 vs 透明基线</h2></div><button id="close-earth" class="text-button" aria-label="关闭地球校准">← 返回行星</button></div>
+    <p class="muted">按 docs/15 P16：固定数据来源 + 单位 + 缺测记录 + 校准/留出区间。Phase 1 ship 一个 in-repo 的合成 Holocene 温度曲线（10 000 年，1 年分辨率），可作为 reference。phase 2 替换为 Marcott 2013 / Lisiecki 2005 等真实数据集。</p>
+    <div class="earth-layout">
+      <section class="earth-control">
+        <h3>参考数据</h3>
+        <div class="earth-row">
+          <button id="earth-load-sample" class="button secondary" type="button">载入合成 Holocene 数据</button>
+        </div>
+        <p id="earth-status" class="muted small" role="status">尚未加载参考数据。</p>
+        <h4>校准（train / 留出区间）</h4>
+        <label>Train 比例<input id="earth-train" type="number" value="0.7" min="0.5" max="0.95" step="0.05"/></label>
+        <label>基线<select id="earth-baseline"><option value="constant-mean">常量均值（最简）</option><option value="linear-trend" selected>线性趋势</option><option value="persistence">持续性（末值）</option></select></label>
+        <label>校准量<select id="earth-quantity"><option value="temperatureK" selected>温度 (K)</option><option value="seaLevelM">海平面 (m)</option><option value="co2ppm">CO₂ (ppm)</option><option value="iceCoverageFrac">冰盖覆盖 (frac)</option></select></label>
+        <div class="earth-row">
+          <button id="earth-run" class="button primary" type="button">用当前世界轨迹校准</button>
+        </div>
+        <p class="muted small">校准用世界当前 tick 推一条"几乎恒定温度"的占位轨迹（demo），真实场景接 P17 多种子批量。</p>
+        <details class="model-notes"><summary>验收门</summary><p>docs/15 P16：<em>"优于透明基线才声明预测技能"</em>。基线 = <code>constant-mean</code> / <code>linear-trend</code> / <code>persistence</code> 三选一，对比 <strong>RMSE</strong>。报告 <code>beatsBaseline</code> 字段标记是否胜出。</p></details>
+      </section>
+      <section class="earth-stats">
+        <h3>累计状态</h3>
+        <ul id="earth-summary" class="earth-list">
+          <li><strong>数据源</strong><span class="muted">—</span></li>
+          <li><strong>点数</strong><span class="muted">—</span></li>
+          <li><strong>区间</strong><span class="muted">—</span></li>
+          <li><strong>缺测</strong><span class="muted">—</span></li>
+          <li><strong>校准 RMSE</strong><span class="muted">—</span></li>
+          <li><strong>基线 RMSE</strong><span class="muted">—</span></li>
+          <li><strong>是否胜出</strong><span class="muted">—</span></li>
+        </ul>
+      </section>
+    </div>
+  </section>
+  <section id="v14-dialog" class="explore-stage-panel" data-explore="v14"><div class="panel-heading"><div><div class="eyebrow">3D VISUAL ROUTE / P14-V</div><h2>视觉实验 · 5 种程序化模型 · 多快照对比</h2></div><button id="close-v14" class="text-button" aria-label="关闭视觉实验">← 返回行星</button></div>
+    <p class="muted">按 docs/04：<strong>World Labs / Marble / Atlas / Spark 真实 API 接入需要 API key + 商业条款</strong>，本实验在仓库内用程序化生成模拟这 5 个 kind 的输出（terrain / tree / building / rock / humanoid）。每次生成创建一条<strong>快照</strong>，存到实验簿；点列表里任意快照可重新渲染，<strong>对比模式</strong>同时显示两条。相同的 seed + style 总是产生相同的网格，方便对照。</p>
+    <div class="v14-grid">
+      <section class="v14-control">
+        <h3>生成新快照</h3>
+        <label>模型类型<select id="v14-kind"><option value="terrain" selected>terrain（地形高度图）</option><option value="tree">tree（程序化树）</option><option value="building">building（建筑）</option><option value="rock">rock（岩石）</option><option value="humanoid">humanoid（人形）</option><option value="cityscape">cityscape（聚落天际线）</option></select></label>
+        <label>风格<select id="v14-style"><option value="smooth" selected>smooth</option><option value="rocky">rocky</option><option value="crystal">crystal</option><option value="organic">organic</option></select></label>
+        <label>分辨率（4—256）<input id="v14-resolution" type="number" value="32" min="4" max="256" step="1"/></label>
+        <label>种子<select id="v14-seed-mode"><option value="random" selected>随机（每次刷新）</option><option value="prompt">用 prompt 派生</option><option value="fixed">固定</option></select></label>
+        <label>提示词<input id="v14-prompt" type="text" maxlength="64" placeholder="例：海岸 / 红杉 / 教堂"/></label>
+        <label>显式 seed（仅 fixed 模式）<input id="v14-fixed-seed" type="text" maxlength="32" value="v14-demo-1"/></label>
+        <label>快照标签（可选）<input id="v14-label" type="text" maxlength="80" placeholder="留空自动按 kind/style/res/tick"/></label>
+        <div class="v14-row">
+          <button id="v14-generate" class="button primary" type="button">生成 3D 模型</button>
+          <button id="v14-compare-toggle" class="button secondary" type="button">对比两个快照</button>
+        </div>
+        <p id="v14-status" class="muted small" role="status">尚未生成。</p>
+        <details id="v14-batch-details" class="v14-batch-section">
+          <summary>批量参数扫描（G）</summary>
+          <p class="muted small">跨 seeds × kinds × styles 一次性生成多条快照。生成的快照都加到列表里，不切换当前 active。</p>
+          <label>kind（多选）<select id="v14-batch-kinds" multiple size="5"><option value="terrain" selected>terrain</option><option value="tree" selected>tree</option><option value="building" selected>building</option><option value="rock" selected>rock</option><option value="humanoid" selected>humanoid</option></select></label>
+          <label>style（多选）<select id="v14-batch-styles" multiple size="4"><option value="smooth" selected>smooth</option><option value="rocky" selected>rocky</option><option value="crystal" selected>crystal</option><option value="organic" selected>organic</option></select></label>
+          <label>seed 数（1—16）<input id="v14-batch-seeds" type="number" value="4" min="1" max="16" step="1"/></label>
+          <label>分辨率<select id="v14-batch-resolution"><option value="8">8（快）</option><option value="16" selected>16</option><option value="24">24</option><option value="32">32</option></select></label>
+          <label>label 前缀（可选）<input id="v14-batch-label-prefix" type="text" maxlength="32" placeholder="例：scan-A"/></label>
+          <div class="v14-row"><button id="v14-batch-run" class="button primary" type="button">运行扫描</button><button id="v14-batch-clear" class="text-button" type="button">清空结果</button></div>
+          <p id="v14-batch-status" class="muted small" role="status">尚未运行扫描。</p>
+          <div id="v14-batch-output" class="v14-batch-output" hidden>
+            <h4>扫描结果</h4>
+            <ul id="v14-batch-summary" class="v14-list v14-meta"></ul>
+            <h4>kind 分布</h4>
+            <svg id="v14-batch-hist-kind" class="v14-histogram" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="kind 分布"></svg>
+            <h4>style 分布</h4>
+            <svg id="v14-batch-hist-style" class="v14-histogram" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="style 分布"></svg>
+            <h4>顶点数量分布</h4>
+            <svg id="v14-batch-hist-vertex" class="v14-histogram" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="顶点数量分布"></svg>
+            <h4>生成耗时（ms）</h4>
+            <svg id="v14-batch-hist-duration" class="v14-histogram" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="生成耗时分布"></svg>
+          </div>
+        </details>
+        <details class="model-notes"><summary>机制与诚实边界</summary>
+          <p><strong>terrain</strong>：FBM 4-octave 高度图，转三角网，按高度上色（水 / 沙 / 草 / 雪）。</p>
+          <p><strong>tree</strong>：递归分支 + 三层 canopy 锥体；branches 数 5—9。</p>
+          <p><strong>building</strong>：墙壁 + 斜屋顶 + 窗 + 门；墙高 1.6—2.6。</p>
+          <p><strong>rock</strong>：icosphere 细分 + 角向位移；rocky 风格位移更大。</p>
+          <p><strong>humanoid</strong>：icosphere 头 + capsule 躯干 + 四肢 + 手 / 脚；organic 风格更圆。</p>
+          <p><strong>真实 API</strong>：Marble / Atlas / World API / Spark 都需要 docs/04 提到的 key + 商业协议；目前是 honest stub，<code>worldLabs</code> / <code>atlas</code> / <code>spark</code> 三个 backend 选择会抛错提示。</p>
+          <p>渲染：Three.js + WebGL（<code>BufferGeometry</code> + <code>MeshStandardMaterial</code> + <code>OrbitControls</code>），鼠标拖动旋转 / 滚轮缩放；3 灯（ambient + key + fill）；顶点法线自动计算。</p>
+        </details>
+      </section>
+      <section class="v14-list-pane">
+        <h3>快照列表<span id="v14-list-count" class="muted small"></span></h3>
+        <ul id="v14-list" class="v14-list"></ul>
+      </section>
+      <section class="v14-view" id="v14-view-pane">
+        <div class="v14-view-header">
+          <h3 id="v14-view-title">3D 视图</h3>
+          <p id="v14-banner" class="muted small">Backend: —</p>
+        </div>
+        <div id="v14-single-pane">
+          <canvas id="v14-canvas" role="img" aria-label="程序化 3D 模型渲染区"></canvas>
+        </div>
+        <div id="v14-compare-pane" hidden>
+          <div class="v14-compare-controls">
+            <label>左<select id="v14-compare-left"></select></label>
+            <label>右<select id="v14-compare-right"></select></label>
+          </div>
+          <div class="v14-compare-canvases">
+            <div class="v14-compare-cell"><canvas id="v14-canvas-left" role="img" aria-label="对比左"></canvas><span id="v14-compare-left-label" class="muted small"></span></div>
+            <div class="v14-compare-cell"><canvas id="v14-canvas-right" role="img" aria-label="对比右"></canvas><span id="v14-compare-right-label" class="muted small"></span></div>
+          </div>
+        </div>
+        <ul id="v14-meta" class="v14-list v14-meta">
+          <li><strong>当前快照</strong><span class="muted">—</span></li>
+          <li><strong>kind / style / res</strong><span class="muted">—</span></li>
+          <li><strong>vertices</strong><span class="muted">—</span></li>
+          <li><strong>triangles</strong><span class="muted">—</span></li>
+          <li><strong>bbox radius</strong><span class="muted">—</span></li>
+          <li><strong>source</strong><span class="muted">—</span></li>
+        </ul>
+      </section>
+    </div>
+  </section>
+</body></html>
