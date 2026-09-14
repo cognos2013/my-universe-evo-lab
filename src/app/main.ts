@@ -931,11 +931,19 @@ worker.onmessage=(event:MessageEvent<Reply>)=>{
     $<HTMLButtonElement>('expand-capacity').disabled=d.cohortLimit>=100000||d.running;
     $('history-storage').textContent=`历史检查点 ${d.historyStorage.checkpoints} · ${(d.historyStorage.checkpointBytes/1_000_000).toFixed(1)} MB · ${d.historyStorage.sampled?'趋势已抽样，任意历史日仍可重放':'趋势逐日记录'}`;
     $('loading').hidden=true;view?.update(d);surfaceView?.update(fromProjection(d));updateSettlementMarkers(d);updateBiomassMarkers(d);updateWeatherMarkers(d);updateVegetationMarkers(d);drawChart();
+    // PR-C: refresh the 5a/5b/6 sub-content cards. Cheap
+    // string formatting only; nothing here mutates state.
+    updateStep5Content(d as unknown as Parameters<typeof updateStep5Content>[0]);
     // PR-C: tick-driven 5a → 5b → 6 sub-phase promotion.
     // Cheap, idempotent; the function early-returns when the
     // sub-phase has already been advanced or the user isn't
     // on step 5 yet, so it adds no work to step 1—4 traffic.
-    maybeAutoAdvancePhase5(d.tick);
+    try {
+      maybeAutoAdvancePhase5(d.tick);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[step5] auto-advance failed', err);
+    }
     // P3.6 — refresh the cell-centre cache when the world
     // changes (create / import / refine). loadCellCenters is
     // a no-op when the cache is fresh, so calling it on every
@@ -1268,6 +1276,54 @@ function renderOnboarding() {
  * mutation; the tick listener calls `maybeAutoAdvancePhase5`
  * separately so we don't recursively re-render.
  */
+/**
+ * PR-C: fill the 5a / 5b / 6 sub-content cards with live
+ * projection data. Pure read; the `is-zero` class dims
+ * stats that haven't moved yet so the user can see at a
+ * glance which subsystems have been "warmed up".
+ */
+function updateStep5Content(d: { tick: number; summary: {
+  temperatureK: number; nutrientMu: number; population: number;
+  activeLineages: number; diversity: number; cohorts: number;
+  biomassMu: number; detritusMu: number;
+}; lastEvent: string; branchId: string; cohortLimit: number;
+  historyStorage: { checkpoints: number; sampled: boolean };
+  temperature: number[] }): void {
+  const set = (id: string, value: string, isZero = false): void => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+    el.classList.toggle('is-zero', isZero);
+  };
+  // 5a: planet stats
+  const cells = d.temperature.length;
+  const oceanCells = d.temperature.filter(t => t < 273.15).length;
+  const landCells = cells - oceanCells;
+  set('step5a-temp', `${d.summary.temperatureK.toFixed(1)} K`);
+  set('step5a-nutrient', `${format(d.summary.nutrientMu)} MU`);
+  set('step5a-ocean', `${oceanCells} / ${landCells}`);
+  // Energy is not on the wire as a single number; we show the
+  // approximate "irradiance × area × dt" budget per tick so the
+  // card isn't blank. The exact value lives in the environment
+  // ledger — we surface it via the cell-centre card when the
+  // user clicks a cell.
+  set('step5a-energy', `${(cells * 340 * 86400).toExponential(1)} J/日`);
+  set('step5a-recycle', `${format(d.summary.detritusMu)} MU 碎屑`);
+  set('step5a-event', d.lastEvent || '—', d.lastEvent === '');
+  // 5b: life stats
+  set('step5b-population', format(d.summary.population), d.summary.population === 0);
+  set('step5b-lineages', format(d.summary.activeLineages), d.summary.activeLineages === 0);
+  set('step5b-diversity', d.summary.diversity.toFixed(2), d.summary.diversity === 0);
+  set('step5b-cohorts', `${format(d.summary.cohorts)} / ${format(d.cohortLimit)}`);
+  set('step5b-history', `${d.historyStorage.checkpoints} 检查点 · ${d.historyStorage.sampled ? '趋势已抽样' : '逐日'}`);
+  set('step5b-day', `第 ${format(d.tick)} 日`);
+  // 6: free-explore summary
+  set('step6-completed', `${onboarding.completedSteps.length} / 6`);
+  set('step6-population', format(d.summary.population), d.summary.population === 0);
+  set('step6-branch', d.branchId === 'main' || d.branchId === '' ? '主时间线' : d.branchId);
+  set('step6-elapsed', `${format(d.tick)} 日`);
+}
+
 function updateStep5Substep(tick: number): void {
   const nav = $('step5-substep');
   if (!nav) return;
@@ -1296,6 +1352,18 @@ function updateStep5Substep(tick: number): void {
     const progress = p.el.querySelector<HTMLElement>('.step5-substep-progress');
     if (progress) progress.textContent = p.label;
   }
+  // PR-C: switch the matching sub-content panel. Only one of
+  // the three (5a/5b/6) is visible at a time; the others stay
+  // hidden so the user clearly sees which phase is active.
+  const activePhase: Step5Phase | null = onboarding.step === 6 ? '6' : (onboarding.step === 5 ? onboarding.phase5 : null);
+  for (const id of ['step5-content-5a', 'step5-content-5b', 'step5-content-6']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const wantsShow = (id === 'step5-content-5a' && activePhase === '5a') ||
+                      (id === 'step5-content-5b' && activePhase === '5b') ||
+                      (id === 'step5-content-6'  && activePhase === '6');
+    el.hidden = !wantsShow;
+  }
 }
 
 /**
@@ -1308,6 +1376,8 @@ function maybeAutoAdvancePhase5(tick: number): void {
   // Only meaningful once the user is on step 5 or step 6.
   if (onboarding.step < 5) return;
   if (onboarding.step === 6) return; // already terminal
+  // eslint-disable-next-line no-console
+  console.log('[step5] tick=', tick, 'phase5=', onboarding.phase5, '5aDone=', step5aComplete(tick), '5bDone=', step5bComplete(tick));
   // 5a → 5b
   if (onboarding.phase5 === '5a' && step5aComplete(tick)) {
     onboarding = setStep5Phase(onboarding, '5b');

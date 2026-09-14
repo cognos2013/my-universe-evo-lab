@@ -180,6 +180,49 @@
         <span class="step5-substep-progress" id="step6-progress">已解锁</span>
       </button>
     </nav>
+    <section id="step5-content-5a" class="step5-content" hidden aria-label="5a 行星演化实时数据">
+      <div class="step5-content-head">
+        <div class="step5-content-eyebrow">5a · 行星演化</div>
+        <h2 class="step5-content-title">看 100 日内地表与气候自然变化</h2>
+        <p class="step5-content-body">温度、海陆比、营养池、能量收支会在这个阶段稳定下来。按底部 <b>▶ 开始演化</b> 推进,日进度会自动跑满 100。</p>
+      </div>
+      <div class="step5-content-grid">
+        <div class="step5-stat"><div class="step5-stat-label">平均温度</div><div class="step5-stat-value" id="step5a-temp">— K</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">营养池</div><div class="step5-stat-value" id="step5a-nutrient">— MU</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">海陆比</div><div class="step5-stat-value" id="step5a-ocean">— / —</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">能量收支</div><div class="step5-stat-value" id="step5a-energy">— J</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">回收率</div><div class="step5-stat-value" id="step5a-recycle">— MU</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">事件</div><div class="step5-stat-value" id="step5a-event">—</div></div>
+      </div>
+    </section>
+    <section id="step5-content-5b" class="step5-content" hidden aria-label="5b 生命演化实时数据">
+      <div class="step5-content-head">
+        <div class="step5-content-eyebrow">5b · 生命演化</div>
+        <h2 class="step5-content-title">看 1000 日内种群从 0 到稳态</h2>
+        <p class="step5-content-body">前一阶段已建好行星,这一阶段只看生命。个体数 / 多样性 / 谱系数会快速波动,然后趋于稳态。继续按 <b>▶ 开始演化</b> 直到 1000 日。</p>
+      </div>
+      <div class="step5-content-grid">
+        <div class="step5-stat"><div class="step5-stat-label">个体数</div><div class="step5-stat-value" id="step5b-population">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">谱系数</div><div class="step5-stat-value" id="step5b-lineages">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">多样性</div><div class="step5-stat-value" id="step5b-diversity">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">队列容量</div><div class="step5-stat-value" id="step5b-cohorts">— / —</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">历史</div><div class="step5-stat-value" id="step5b-history">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">日</div><div class="step5-stat-value" id="step5b-day">—</div></div>
+      </div>
+    </section>
+    <section id="step5-content-6" class="step5-content" hidden aria-label="第 6 步 自由探索">
+      <div class="step5-content-head">
+        <div class="step5-content-eyebrow">6 · 自由探索</div>
+        <h2 class="step5-content-title">所有 P1—P17 实验已开放</h2>
+        <p class="step5-content-body">右侧 <b>EXPLORE ▶</b> 侧栏列出全部实验面板 — 推进 / 干预 / 对照 / 化学 / 多细胞 / 智能 / 聚落 / 校准 / 批量。点击顶部 EXPORE 展开。</p>
+      </div>
+      <div class="step5-content-grid">
+        <div class="step5-stat"><div class="step5-stat-label">已完成步骤</div><div class="step5-stat-value" id="step6-completed">— / 6</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">个体数</div><div class="step5-stat-value" id="step6-population">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">分支</div><div class="step5-stat-value" id="step6-branch">—</div></div>
+        <div class="step5-stat"><div class="step5-stat-label">已用时间</div><div class="step5-stat-value" id="step6-elapsed">—</div></div>
+      </div>
+    </section>
     <section class="universe-view" aria-label="行星观察">
       <div class="view-top"><div><div class="eyebrow">EXPERIMENT 01 / ORIGIN</div><h1>一颗星球，无数种可能。</h1><p>让生命开始，观察变化留下的痕迹。</p><button id="open-cosmos" class="text-button">← 宇宙总览</button>　<button id="open-history" class="text-button">浏览宇宙年表 ↗</button></div><div class="world-coordinate">本地宇宙<span id="branch-label">主时间线</span></div></div>
       <div id="globe" aria-label="三维星球，拖动旋转，滚轮缩放，点击选择区域" role="img"></div>
