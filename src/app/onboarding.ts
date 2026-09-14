@@ -86,6 +86,89 @@ export const STEP_5A_DONE_TICK = 100;
 export const STEP_5B_DONE_TICK = 1000;
 
 /**
+ * PR-F — per-role tick thresholds for the 5a / 5b sub-phases.
+ * The K12 design review split `Role` into four audiences with
+ * different attention spans; elementary students should not
+ * wait 1000 simulated days to reach 自由探索, while 高中生
+ * are encouraged to run longer to see equilibrium dynamics.
+ * The defaults above remain in case a cold start has no
+ * `BootChoice` (shouldn't happen after PR-A, but keeps the
+ * helpers safe).
+ */
+export const ROLE_THRESHOLDS: Record<Role, { step5aTick: number; step5bTick: number }> = {
+  elementary: { step5aTick: 50,   step5bTick: 200  }, // 短小快,先把故事讲完
+  middle:    { step5aTick: 100,  step5bTick: 1000 }, // 默认
+  high:      { step5aTick: 200,  step5bTick: 2000 }, // 留时间看平衡
+  teacher:   { step5aTick: 100,  step5bTick: 1000 }, // 同 middle,加教学提示
+};
+
+/**
+ * PR-F — pick the live 5a/5b tick thresholds for the current
+ * boot choice. Falls back to the 100/1000 defaults when no
+ * boot choice is present.
+ */
+export function getRoleThresholds(boot: BootChoice | null): { step5aTick: number; step5bTick: number } {
+  if (!boot) return { step5aTick: STEP_5A_DONE_TICK, step5bTick: STEP_5B_DONE_TICK };
+  return ROLE_THRESHOLDS[boot.role];
+}
+
+/**
+ * PR-F — role-specific guidance for each step. Keys mirror
+ * `OnboardingStep`. Each entry is a short sentence the wizard
+ * surfaces in the hero card body when the user has picked
+ * the matching role. Roles without an override (e.g. teacher
+ * on step 1) fall back to the default `STEP_META` body.
+ */
+export const ROLE_STEP_GUIDANCE: Partial<Record<OnboardingStep, Partial<Record<Role, string>>>> = {
+  1: {
+    elementary: '想象一个比沙粒还小的点,慢慢变成满天星斗。这是宇宙的开始 — 不用记数字,先看看颜色怎么变。',
+    middle:    'ΛCDM 简化背景:H₀ = 67.4 km/s/Mpc · Ωm = 0.315 · ΩΛ = 0.685。看 138 亿年尺度上空间的膨胀。',
+    high:      '平坦 ΛCDM 背景(教学简化,不是观测校准)。重点观察 138 亿年间空间膨胀 + 暗能量占比。',
+  },
+  2: {
+    elementary: '8 团气体云会自己变成星系。点一个看,看 5 百万年会发生什么。',
+    middle:    '8 个孤立气体晕(不叠加哈勃流)。每个晕有自己的质量、坐标和 5 Myr 步长。',
+    high:      '预置 8 个气体晕,孤立系统(不叠加哈勃流)。看坍缩 + 第一代恒星群 + 引力装配。',
+  },
+  3: {
+    elementary: '在气体云里挑一颗"合适"的恒星,周围有类地行星就行。',
+    middle:    '恒星用三个质量档(0.1 / 1 / 10 M☉)与教学寿命/回流/光度值,并未观测校准。',
+    high:      '恒星三质量档(0.1/1/10 M☉)与教学值,未做观测校准 — 与现实有出入,设计取舍见 model card。',
+  },
+  4: {
+    elementary: '选一个起点,接下来我们就看你这颗行星上会发生什么。',
+    middle:    '场景决定生命起点(两种生命/无生命/有限资源),种子决定可复现的演化历史。',
+    high:      '场景 = 生命起点 + 物质约束;种子 = 复现性;初始温度决定 habitable zone 位置。',
+  },
+  5: {
+    elementary: '等一会儿,让星星自己讲故事 — 我们看看温度、生命会怎么变。',
+    middle:    '5a(行星 100 日) + 5b(生命 1000 日)。先看行星本身的物理/化学演化,再追踪生命曲线。',
+    high:      '5a 行星物理/化学 100 日 → 5b 生命曲线 1000 日 → 自由探索。三个阶段都通过 tick 阈值自动推进。',
+  },
+  6: {
+    elementary: '接下来你可以随便玩 — 改温度、加营养、看看星球会怎样。',
+    middle:    '所有 P1—P9 + P12—P17 实验都开放。推进 / 干预 / 对照 / 化学 / 多细胞 / 智能 / 聚落 / 校准 / 批量。',
+    high:      '自由探索阶段:可用 P1—P9 + P12—P17 全套工具。重点对照实验(addNutrient/changeForcing/editTraits)。',
+  },
+};
+
+/**
+ * PR-F — pick the role-specific guidance for a given step +
+ * role. Falls back to the default `STEP_META` body when no
+ * role-specific text exists.
+ */
+export function getRoleStepGuidance(step: OnboardingStep, role: Role | null): string {
+  if (role !== null) {
+    const byStep = ROLE_STEP_GUIDANCE[step];
+    if (byStep) {
+      const text = byStep[role];
+      if (text) return text;
+    }
+  }
+  return STEP_META[step].body;
+}
+
+/**
  * Step 5 has two sub-stages tracked out-of-band in `OnboardingState`.
  * We model them as a string sub-state so the rest of the code can
  * still treat the wizard as 6 steps (no 5.5 / 5.75 in the type).

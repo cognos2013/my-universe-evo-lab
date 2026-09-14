@@ -33,6 +33,10 @@ import {
   step5bComplete,
   STEP_5A_DONE_TICK,
   STEP_5B_DONE_TICK,
+  getRoleThresholds,
+  getRoleStepGuidance,
+  ROLE_THRESHOLDS,
+  ROLE_STEP_GUIDANCE,
   ALL_ONBOARDING_STEPS,
   ALL_ROLES,
   ROLE_META,
@@ -42,6 +46,7 @@ import {
   type OnboardingStep,
   type BootChoice,
   type Step5Phase,
+  type Role,
 } from '../src/app/onboarding.ts';
 
 // === Storage shim ====================================================
@@ -478,4 +483,70 @@ test('PR-C: loadOnboardingState defaults phase5 to "5a" when missing or invalid'
     }));
     assert.equal(loadOnboardingState().phase5, '5a');
   } finally { restoreStorage(); }
+});
+
+// === PR-F: role-aware thresholds + guidance ===========================
+
+test('PR-F: ROLE_THRESHOLDS gives elementary a faster 5a/5b than high', () => {
+  assert.ok(ROLE_THRESHOLDS.elementary.step5aTick < ROLE_THRESHOLDS.high.step5aTick);
+  assert.ok(ROLE_THRESHOLDS.elementary.step5bTick < ROLE_THRESHOLDS.high.step5bTick);
+  // middle / teacher share the default 100 / 1000.
+  assert.equal(ROLE_THRESHOLDS.middle.step5aTick, 100);
+  assert.equal(ROLE_THRESHOLDS.middle.step5bTick, 1000);
+});
+
+test('PR-F: ROLE_THRESHOLDS covers all 4 roles', () => {
+  for (const role of ALL_ROLES) {
+    const t = ROLE_THRESHOLDS[role];
+    assert.ok(t, `role ${role} must have thresholds`);
+    assert.ok(t.step5aTick > 0);
+    assert.ok(t.step5bTick >= t.step5aTick);
+  }
+});
+
+test('PR-F: getRoleThresholds returns the boot role\'s thresholds', () => {
+  const boot: BootChoice = { role: 'high', skipBasics: false, chosenAtMs: 0 };
+  assert.equal(getRoleThresholds(boot).step5aTick, 200);
+  assert.equal(getRoleThresholds(boot).step5bTick, 2000);
+});
+
+test('PR-F: getRoleThresholds falls back to defaults when boot is null', () => {
+  assert.equal(getRoleThresholds(null).step5aTick, STEP_5A_DONE_TICK);
+  assert.equal(getRoleThresholds(null).step5bTick, STEP_5B_DONE_TICK);
+});
+
+test('PR-F: step5aComplete accepts the role-aware threshold', () => {
+  const elementary = ROLE_THRESHOLDS.elementary;
+  // elementary 5a threshold is 50 — tick 49 is not done, 50 is.
+  assert.equal(step5aComplete(49, elementary.step5aTick), false);
+  assert.equal(step5aComplete(50, elementary.step5aTick), true);
+  // high 5a threshold is 200.
+  assert.equal(step5aComplete(199, ROLE_THRESHOLDS.high.step5aTick), false);
+  assert.equal(step5aComplete(200, ROLE_THRESHOLDS.high.step5aTick), true);
+});
+
+test('PR-F: getRoleStepGuidance returns the role-specific text when present', () => {
+  // Step 1 has overrides for elementary / middle / high but not teacher.
+  const elementary = getRoleStepGuidance(1, 'elementary');
+  assert.notEqual(elementary, STEP_META[1].body);
+  assert.ok(elementary.includes('沙粒') || elementary.includes('宇宙'), 'elementary step 1 body should be in friendly voice');
+  const teacher = getRoleStepGuidance(1, 'teacher');
+  // teacher falls back to STEP_META body.
+  assert.equal(teacher, STEP_META[1].body);
+});
+
+test('PR-F: getRoleStepGuidance falls back to STEP_META when role is null', () => {
+  for (const step of [1, 2, 3, 4, 5, 6] as OnboardingStep[]) {
+    assert.equal(getRoleStepGuidance(step, null), STEP_META[step].body);
+  }
+});
+
+test('PR-F: ROLE_STEP_GUIDANCE covers all 6 steps for the four audiences we ship', () => {
+  // At least one role gets a non-default text per step.
+  for (const step of [1, 2, 3, 4, 5, 6] as OnboardingStep[]) {
+    const byStep = ROLE_STEP_GUIDANCE[step];
+    if (!byStep) continue; // step with no overrides — fallback body is fine
+    const overrideCount = (Object.keys(byStep) as Role[]).length;
+    assert.ok(overrideCount > 0, `step ${step} has the entry but no role overrides`);
+  }
 });

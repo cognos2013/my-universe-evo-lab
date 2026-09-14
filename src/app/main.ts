@@ -21,6 +21,8 @@ import {
   setStep5Phase,
   step5aComplete,
   step5bComplete,
+  getRoleThresholds,
+  getRoleStepGuidance,
   STEP_5A_DONE_TICK,
   STEP_5B_DONE_TICK,
   type OnboardingStep,
@@ -1218,6 +1220,28 @@ mountCosmos(
  * `<main>` block). The progress bar reflects the active step
  * and dims the dots for steps that aren't reachable yet.
  */
+/**
+ * PR-F — rewrite the 5 step hero cards' body text using the
+ * role-aware guidance. Falls back to the static `STEP_META`
+ * body when no override exists for the picked role. Called
+ * from `renderOnboarding` so a fresh boot choice (or a
+ * "重新开始" reset) repaints the wizard with the new voice.
+ */
+function updateRoleGuidance(): void {
+  const boot = loadBootChoice();
+  const role: Role | null = boot?.role ?? null;
+  for (const step of [1, 2, 3, 4, 5, 6] as OnboardingStep[]) {
+    const body = document.getElementById(`onboarding-body-${step}`);
+    if (!body) continue;
+    body.textContent = getRoleStepGuidance(step, role);
+  }
+  // PR-F: for `teacher` role, surface a small "教学演示" hint
+  // badge on step 5 so the user knows the wizard is a teaching
+  // aid and not just a sandbox.
+  const teacherHint = document.getElementById('onboarding-teacher-hint');
+  if (teacherHint) teacherHint.hidden = role !== 'teacher';
+}
+
 function renderOnboarding() {
   // PR-C: stage visible for steps 1—4; mainEl/explore sidebar
   // visible for steps 5 and 6 (the "演化中" sub-wizard and the
@@ -1253,6 +1277,9 @@ function renderOnboarding() {
   // pills the user hasn't earned yet, and update the "X / Y 日"
   // progress label using the live `tick` from the worker.
   updateStep5Substep(projection?.tick ?? 0);
+  // PR-F: rewrite the hero card body text in the user's role
+  // voice. Cheap; only touches the 6 body elements.
+  updateRoleGuidance();
   // The cosmos dialog has its own "进入当前生命星球" button
   // that lands on step 5; we wire that here so the user can
   // both arrive at step 5 from a "deeper" dialog AND jump to
@@ -1331,11 +1358,17 @@ function updateStep5Substep(tick: number): void {
   // (the sub-pills are a 5a/5b/6 thing, not a 1—4 thing).
   nav.hidden = onboarding.step < 5;
   if (nav.hidden) return;
-  const phase5aDone = step5aComplete(tick);
-  const phase5bDone = step5bComplete(tick);
+  // PR-F: pick the role-aware 5a/5b tick thresholds. The
+  // boot choice drives `step5aTick` (elementary 50, default
+  // 100, high 200) so different audiences advance the wizard
+  // at different simulated-day milestones.
+  const boot = loadBootChoice();
+  const thresholds = getRoleThresholds(boot);
+  const phase5aDone = step5aComplete(tick, thresholds.step5aTick);
+  const phase5bDone = step5bComplete(tick, thresholds.step5bTick);
   const pills: Array<{ phase: Step5Phase; el: HTMLButtonElement | null; done: boolean; label: string }> = [
-    { phase: '5a', el: nav.querySelector<HTMLButtonElement>('[data-phase="5a"]'), done: phase5aDone, label: `${Math.min(tick, STEP_5A_DONE_TICK)} / ${STEP_5A_DONE_TICK} 日` },
-    { phase: '5b', el: nav.querySelector<HTMLButtonElement>('[data-phase="5b"]'), done: phase5bDone, label: `${Math.min(tick, STEP_5B_DONE_TICK)} / ${STEP_5B_DONE_TICK} 日` },
+    { phase: '5a', el: nav.querySelector<HTMLButtonElement>('[data-phase="5a"]'), done: phase5aDone, label: `${Math.min(tick, thresholds.step5aTick)} / ${thresholds.step5aTick} 日` },
+    { phase: '5b', el: nav.querySelector<HTMLButtonElement>('[data-phase="5b"]'), done: phase5bDone, label: `${Math.min(tick, thresholds.step5bTick)} / ${thresholds.step5bTick} 日` },
     { phase: '6',  el: nav.querySelector<HTMLButtonElement>('[data-phase="6"]'),  done: phase5bDone, label: phase5bDone ? '已解锁' : '等待 5b 完成' },
   ];
   for (const p of pills) {
@@ -1376,23 +1409,28 @@ function maybeAutoAdvancePhase5(tick: number): void {
   // Only meaningful once the user is on step 5 or step 6.
   if (onboarding.step < 5) return;
   if (onboarding.step === 6) return; // already terminal
+  // PR-F: role-aware thresholds. Elementary students advance
+  // the wizard at 50/200 days, 高中生 at 200/2000. The toast
+  // below surfaces the actual number so the user knows why.
+  const boot = loadBootChoice();
+  const thresholds = getRoleThresholds(boot);
   // eslint-disable-next-line no-console
-  console.log('[step5] tick=', tick, 'phase5=', onboarding.phase5, '5aDone=', step5aComplete(tick), '5bDone=', step5bComplete(tick));
+  console.log('[step5] tick=', tick, 'phase5=', onboarding.phase5, '5aDone=', step5aComplete(tick, thresholds.step5aTick), '5bDone=', step5bComplete(tick, thresholds.step5bTick), 'role=', boot?.role ?? 'none');
   // 5a → 5b
-  if (onboarding.phase5 === '5a' && step5aComplete(tick)) {
+  if (onboarding.phase5 === '5a' && step5aComplete(tick, thresholds.step5aTick)) {
     onboarding = setStep5Phase(onboarding, '5b');
     persistOnboarding();
     renderOnboarding();
-    toast(`已自动进入 5b(生命演化),阈值 ${STEP_5A_DONE_TICK} 日`);
+    toast(`已自动进入 5b(生命演化),阈值 ${thresholds.step5aTick} 日`);
     return;
   }
   // 5b → 6 (自由探索)
-  if (onboarding.phase5 === '5b' && step5bComplete(tick)) {
+  if (onboarding.phase5 === '5b' && step5bComplete(tick, thresholds.step5bTick)) {
     onboarding = setStep5Phase(onboarding, '6');
     onboarding = advanceOnboardingState(onboarding, 6);
     persistOnboarding();
     renderOnboarding();
-    toast(`已自动进入第 6 步「自由探索」,阈值 ${STEP_5B_DONE_TICK} 日`);
+    toast(`已自动进入第 6 步「自由探索」,阈值 ${thresholds.step5bTick} 日`);
   }
 }
 
