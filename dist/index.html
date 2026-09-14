@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#080e17"/><meta name="description" content="观察生命，改变条件，探索一颗星球的不同历史。"/><title>我的宇宙 · 演化实验室</title>  <script type="module" crossorigin src="/assets/index-DKnnG5Ni.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-PWraQKQi.css">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#080e17"/><meta name="description" content="观察生命，改变条件，探索一颗星球的不同历史。"/><title>我的宇宙 · 演化实验室</title>  <script type="module" crossorigin src="/assets/index-9ouup9Ri.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CIvW7373.css">
 </head>
 <body>
   <header><a class="brand" href="/" aria-label="我的宇宙首页"><span class="brand-mark">◉</span><span>我的宇宙<small>UNIVERSE LAB</small></span></a><div class="header-center"><span class="live-dot"></span>行星演化实验室 <span class="badge">自由演化</span></div><div class="header-actions"><button id="save" class="text-button">保存</button><button id="export" class="text-button">导出</button><button id="import" class="text-button">导入</button><button id="new-world" class="button secondary">＋ 新建世界</button><button id="explore-toggle-header" class="button secondary" type="button" title="展开 / 折叠探索侧栏" aria-label="展开 / 折叠探索侧栏">EXPLORE ◀</button></div><input id="import-file" type="file" accept=".json,application/json" hidden/></header>
@@ -52,7 +52,8 @@
       <li class="onboarding-step-item" data-step="2"><button class="onboarding-dot" data-step="2" type="button" aria-label="第 2 步 · 星系"><span class="onboarding-dot-num">2</span><span class="onboarding-dot-label">星系</span></button></li>
       <li class="onboarding-step-item" data-step="3"><button class="onboarding-dot" data-step="3" type="button" aria-label="第 3 步 · 恒星"><span class="onboarding-dot-num">3</span><span class="onboarding-dot-label">恒星</span></button></li>
       <li class="onboarding-step-item" data-step="4"><button class="onboarding-dot" data-step="4" type="button" aria-label="第 4 步 · 行星"><span class="onboarding-dot-num">4</span><span class="onboarding-dot-label">行星</span></button></li>
-      <li class="onboarding-step-item" data-step="5"><button class="onboarding-dot" data-step="5" type="button" aria-label="第 5 步 · 演化"><span class="onboarding-dot-num">5</span><span class="onboarding-dot-label">演化</span></button></li>
+      <li class="onboarding-step-item" data-step="5"><button class="onboarding-dot" data-step="5" type="button" aria-label="第 5 步 · 演化"><span class="onboarding-dot-num">5</span><span class="onboarding-dot-label">演化中</span></button></li>
+      <li class="onboarding-step-item" data-step="6"><button class="onboarding-dot" data-step="6" type="button" aria-label="第 6 步 · 自由探索"><span class="onboarding-dot-num">6</span><span class="onboarding-dot-label">自由探索</span></button></li>
     </ol>
     <button id="onboarding-reset" class="text-button onboarding-reset" type="button" title="重置到第 1 步">重新开始</button>
   </nav>
@@ -164,6 +165,23 @@
     </footer>
   </section>
   <main>
+    <nav id="step5-substep" class="step5-substep" hidden aria-label="第 5 步的子阶段">
+      <button class="step5-substep-pill" type="button" data-phase="5a" aria-pressed="false">
+        <span class="step5-substep-num">5a</span>
+        <span class="step5-substep-label">行星演化</span>
+        <span class="step5-substep-progress" id="step5a-progress">0 / 100 日</span>
+      </button>
+      <button class="step5-substep-pill" type="button" data-phase="5b" aria-pressed="false" disabled>
+        <span class="step5-substep-num">5b</span>
+        <span class="step5-substep-label">生命演化</span>
+        <span class="step5-substep-progress" id="step5b-progress">0 / 1000 日</span>
+      </button>
+      <button class="step5-substep-pill step5-substep-final" type="button" data-phase="6" aria-pressed="false" disabled>
+        <span class="step5-substep-num">6</span>
+        <span class="step5-substep-label">自由探索</span>
+        <span class="step5-substep-progress" id="step6-progress">已解锁</span>
+      </button>
+    </nav>
     <section class="universe-view" aria-label="行星观察">
       <div class="view-top"><div><div class="eyebrow">EXPERIMENT 01 / ORIGIN</div><h1>一颗星球，无数种可能。</h1><p>让生命开始，观察变化留下的痕迹。</p><button id="open-cosmos" class="text-button">← 宇宙总览</button>　<button id="open-history" class="text-button">浏览宇宙年表 ↗</button></div><div class="world-coordinate">本地宇宙<span id="branch-label">主时间线</span></div></div>
       <div id="globe" aria-label="三维星球，拖动旋转，滚轮缩放，点击选择区域" role="img"></div>

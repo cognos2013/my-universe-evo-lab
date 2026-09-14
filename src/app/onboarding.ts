@@ -22,9 +22,9 @@
  * touching the old data.
  */
 
-export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
+export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
 
-export const ALL_ONBOARDING_STEPS: readonly OnboardingStep[] = [1, 2, 3, 4, 5] as const;
+export const ALL_ONBOARDING_STEPS: readonly OnboardingStep[] = [1, 2, 3, 4, 5, 6] as const;
 
 /**
  * PR-B — completion-criterion hooks.
@@ -46,7 +46,8 @@ export const STEP_COMPLETION: Record<OnboardingStep, { panel: string | null; nex
   2: { panel: 'galaxy',  nextStep: 3 },     // step 2 → 看星系演化
   3: { panel: 'v14',     nextStep: 4 },     // step 3 → 选恒星系统
   4: { panel: 'create',  nextStep: 5 },     // step 4 → 初始化行星(走 form submit 路径)
-  5: { panel: null,      nextStep: null },  // step 5 = 演化,不再 auto-advance
+  5: { panel: null,      nextStep: null },  // step 5 内部拆 5a/5b,由 sub-completion 推进
+  6: { panel: null,      nextStep: null },  // step 6 = 自由探索,终态
 };
 
 /**
@@ -57,6 +58,52 @@ export const STEP_COMPLETION: Record<OnboardingStep, { panel: string | null; nex
  */
 export function nextStepAfterCompletion(step: OnboardingStep): OnboardingStep | null {
   return STEP_COMPLETION[step].nextStep;
+}
+
+/**
+ * PR-C — step 5a / 5b split + sub-completion.
+ *
+ * Step 5 used to be a single terminal "演化" stage. The 6-stage
+ * design review split it into:
+ *   - 5a (行星演化): watch the planet run for ~100 simulated
+ *     days. Done when `tick >= 100`.
+ *   - 5b (生命演化): keep watching for ~1000 simulated days
+ *     so the population curve has time to settle. Done when
+ *     `tick >= 1000`.
+ *   - 6 (自由探索): open the explore sidebar, run interventions,
+ *     compare branches. The previous "explore" surface.
+ *
+ * The thresholds (100 / 1000) are deliberate defaults from the
+ * 6-stage design doc; both `step5aComplete` and `step5bComplete`
+ * accept any `tick` value so PR-F (学段适配) can lower them for
+ * `elementary` without us having to re-architect.
+ */
+
+/** Default tick threshold for completing step 5a. */
+export const STEP_5A_DONE_TICK = 100;
+
+/** Default tick threshold for completing step 5b. */
+export const STEP_5B_DONE_TICK = 1000;
+
+/**
+ * Step 5 has two sub-stages tracked out-of-band in `OnboardingState`.
+ * We model them as a string sub-state so the rest of the code can
+ * still treat the wizard as 6 steps (no 5.5 / 5.75 in the type).
+ */
+export type Step5Phase = '5a' | '5b' | '6';
+
+export const DEFAULT_STEP5_PHASE: Step5Phase = '5a';
+
+/** Pure helper: returns true if the world has run long enough to
+ *  finish step 5a (planet evolution). */
+export function step5aComplete(tick: number, threshold: number = STEP_5A_DONE_TICK): boolean {
+  return tick >= threshold;
+}
+
+/** Pure helper: returns true if the world has run long enough to
+ *  finish step 5b (life evolution, the slower phase). */
+export function step5bComplete(tick: number, threshold: number = STEP_5B_DONE_TICK): boolean {
+  return tick >= threshold;
 }
 
 /**
@@ -179,13 +226,17 @@ export function clearBootChoice(): void {
 }
 
 export interface OnboardingState {
-  /** Current step (1—5). The progress bar highlights this dot. */
+  /** Current step (1—6). The progress bar highlights this dot. */
   step: OnboardingStep;
+  /** PR-C: which sub-phase of step 5 the user is currently in.
+   *  Only meaningful when `step === 5`. Persists across reloads
+   *  so closing the tab mid-5b does not reset to 5a. */
+  phase5: Step5Phase;
   /** Set of step numbers the user has already passed. Once
    *  step N is reached, all steps 1—N are marked completed so
    *  the user can freely click back. */
   completedSteps: OnboardingStep[];
-  /** When the user finished step 5 for the first time. We
+  /** When the user finished step 6 for the first time. We
    *  show the wizard again on every cold start until this is
    *  set, so a brand-new user always lands on step 1. */
   finishedAtMs: number | null;
@@ -193,6 +244,7 @@ export interface OnboardingState {
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   step: 1,
+  phase5: DEFAULT_STEP5_PHASE,
   completedSteps: [],
   finishedAtMs: null,
 };
@@ -200,18 +252,19 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
 const STORAGE_KEY = 'my-universe-onboarding-v1';
 
 function isStep(n: unknown): n is OnboardingStep {
-  return n === 1 || n === 2 || n === 3 || n === 4 || n === 5;
+  return n === 1 || n === 2 || n === 3 || n === 4 || n === 5 || n === 6;
 }
 
 function sanitise(raw: unknown): OnboardingState {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_ONBOARDING_STATE };
   const o = raw as Record<string, unknown>;
   const step = isStep(o.step) ? o.step : 1;
+  const phase5: Step5Phase = o.phase5 === '5b' || o.phase5 === '6' ? o.phase5 : '5a';
   const completed = Array.isArray(o.completedSteps)
     ? (o.completedSteps.filter(isStep) as OnboardingStep[])
     : [];
   const finishedAtMs = typeof o.finishedAtMs === 'number' ? o.finishedAtMs : null;
-  return { step, completedSteps: completed, finishedAtMs };
+  return { step, phase5, completedSteps: completed, finishedAtMs };
 }
 
 /**
@@ -251,13 +304,33 @@ export function advanceOnboardingState(state: OnboardingState, step: OnboardingS
   }
   const next: OnboardingState = {
     step,
+    // Preserve the user's current 5a/5b/6 phase unless they're
+    // explicitly leaving step 5 — when they enter 5 fresh or
+    // jump back to 5 we reset to 5a so the sub-tabs re-show
+    // the "planet evolution" framing. Leaving step 5 (to 6) is
+    // the responsibility of `setStep5Phase`, which runs before
+    // the caller re-invokes `advanceOnboardingState`.
+    phase5: step === 5 ? '5a' : state.phase5,
     completedSteps: [...completed].sort((a, b) => a - b),
     finishedAtMs: state.finishedAtMs,
   };
-  if (step === 5) {
+  if (step === 6) {
     next.finishedAtMs = state.finishedAtMs ?? (typeof performance !== 'undefined' ? performance.now() : Date.now());
   }
   return next;
+}
+
+/**
+ * PR-C: set the step-5 sub-phase. Idempotent. Returns a new
+ * `OnboardingState` with `phase5` updated; the `step` field is
+ * left untouched so callers that want to combine a phase bump
+ * with a step advance (e.g. 5b → 6) can do:
+ *
+ *   state = setStep5Phase(advanceOnboardingState(state, 6), '6');
+ */
+export function setStep5Phase(state: OnboardingState, phase: Step5Phase): OnboardingState {
+  if (state.phase5 === phase) return state;
+  return { ...state, phase5: phase };
 }
 
 /** Pure helper: is `target` reachable from `current` (either
@@ -309,7 +382,13 @@ export const STEP_META: Record<OnboardingStep, {
   5: {
     eyebrow: 'STEP 5 / EVOLVE',
     title: '在这颗行星上开始演化',
-    body: '所有 P1—P9 + P12—P17 实验都在这里。推进 / 干预 / 对照 / 历史 / 化学 / 多细胞 / 智能 / 聚落 / 校准 / 批量。下面的右侧"探索"栏会基于行星当前状态推荐下一步可以试什么。',
+    body: '5a(行星演化 100 日)+ 5b(生命演化 1000 日)。先看行星本身的物理/化学演化,再追踪生命曲线;都满足后进入第 6 步"自由探索"。',
     cta: { label: '进入演化', action: 'play' },
+  },
+  6: {
+    eyebrow: 'STEP 6 / EXPLORE',
+    title: '自由探索',
+    body: '所有 P1—P9 + P12—P17 实验都开放。推进 / 干预 / 对照 / 历史 / 化学 / 多细胞 / 智能 / 聚落 / 校准 / 批量。右侧"探索"栏会基于行星当前状态推荐下一步可以试什么。',
+    cta: { label: '进入自由探索', action: 'play' },
   },
 };

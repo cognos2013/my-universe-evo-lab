@@ -18,9 +18,15 @@ import {
   ROLE_META,
   STEP_COMPLETION,
   nextStepAfterCompletion,
+  setStep5Phase,
+  step5aComplete,
+  step5bComplete,
+  STEP_5A_DONE_TICK,
+  STEP_5B_DONE_TICK,
   type OnboardingStep,
   type Role,
   type BootChoice,
+  type Step5Phase,
 } from './onboarding.ts';
 import {
   buildExploreState,
@@ -62,12 +68,20 @@ const $=<T extends HTMLElement=HTMLElement>(id:string):T=>document.getElementByI
 let onboarding = loadOnboardingState();
 function persistOnboarding() { saveOnboardingState(onboarding); }
 const onboardingStage = $('onboarding-stage') as HTMLElement;
-const onboardingPanelByStep: Record<OnboardingStep, HTMLElement> = {
+// PR-C: steps 5 and 6 share the `<main>` planet view rather
+// than living inside the onboarding-stage wizard, so they
+// have no `data-step` panel element to look up. The lookup
+// table still has to enumerate every step (TypeScript
+// `Record<OnboardingStep, …>`), so we put `null` for the
+// two stages that own their content elsewhere and rely on
+// the `if (panel)` guard in `renderOnboarding` to skip them.
+const onboardingPanelByStep: Record<OnboardingStep, HTMLElement | null> = {
   1: document.querySelector<HTMLElement>('.onboarding-panel[data-step="1"]')!,
   2: document.querySelector<HTMLElement>('.onboarding-panel[data-step="2"]')!,
   3: document.querySelector<HTMLElement>('.onboarding-panel[data-step="3"]')!,
   4: document.querySelector<HTMLElement>('.onboarding-panel[data-step="4"]')!,
-  5: document.querySelector<HTMLElement>('.onboarding-panel[data-step="5"]')!,
+  5: null,
+  6: null,
 };
 const onboardingDots = document.querySelectorAll<HTMLButtonElement>('.onboarding-dot');
 const onboardingStepItems = document.querySelectorAll<HTMLElement>('.onboarding-step-item');
@@ -917,6 +931,11 @@ worker.onmessage=(event:MessageEvent<Reply>)=>{
     $<HTMLButtonElement>('expand-capacity').disabled=d.cohortLimit>=100000||d.running;
     $('history-storage').textContent=`历史检查点 ${d.historyStorage.checkpoints} · ${(d.historyStorage.checkpointBytes/1_000_000).toFixed(1)} MB · ${d.historyStorage.sampled?'趋势已抽样，任意历史日仍可重放':'趋势逐日记录'}`;
     $('loading').hidden=true;view?.update(d);surfaceView?.update(fromProjection(d));updateSettlementMarkers(d);updateBiomassMarkers(d);updateWeatherMarkers(d);updateVegetationMarkers(d);drawChart();
+    // PR-C: tick-driven 5a → 5b → 6 sub-phase promotion.
+    // Cheap, idempotent; the function early-returns when the
+    // sub-phase has already been advanced or the user isn't
+    // on step 5 yet, so it adds no work to step 1—4 traffic.
+    maybeAutoAdvancePhase5(d.tick);
     // P3.6 — refresh the cell-centre cache when the world
     // changes (create / import / refine). loadCellCenters is
     // a no-op when the cache is fresh, so calling it on every
@@ -1192,15 +1211,17 @@ mountCosmos(
  * and dims the dots for steps that aren't reachable yet.
  */
 function renderOnboarding() {
-  // Stage visible for steps 1—4, hidden for step 5.
-  const onStep5 = onboarding.step === 5;
-  onboardingStage.hidden = onStep5;
-  if (mainEl) mainEl.hidden = !onStep5;
-  // Explore sidebar is the step-5 navigation; it only makes
-  // sense when the user is on the "演化" stage.
-  if (exploreSidebar) exploreSidebar.hidden = !onStep5;
-  if (onStep5) refreshExplore();
-  for (const step of [1, 2, 3, 4, 5] as OnboardingStep[]) {
+  // PR-C: stage visible for steps 1—4; mainEl/explore sidebar
+  // visible for steps 5 and 6 (the "演化中" sub-wizard and the
+  // "自由探索" terminal stage share the same planet-view).
+  const onStage = onboarding.step === 5 || onboarding.step === 6;
+  onboardingStage.hidden = onStage;
+  if (mainEl) mainEl.hidden = !onStage;
+  // Explore sidebar is the post-step-5 navigation; show it on
+  // both step 5 (sub-pill 5b exploration) and step 6.
+  if (exploreSidebar) exploreSidebar.hidden = !onStage;
+  if (onStage) refreshExplore();
+  for (const step of [1, 2, 3, 4, 5, 6] as OnboardingStep[]) {
     const panel = onboardingPanelByStep[step];
     if (panel) panel.hidden = onboarding.step !== step;
   }
@@ -1215,13 +1236,15 @@ function renderOnboarding() {
     item.classList.toggle('completed', onboarding.completedSteps.includes(step));
   }
   onboardingPrev.disabled = onboarding.step <= 1;
-  // Step 5 is the "终态" (演化). The next button has nowhere
-  // to go (no step 6), so disable it rather than silently
-  // doing nothing. Power users can use the progress bar dots
-  // to revisit earlier steps.
-  onboardingNext.disabled = onboarding.step >= 5;
+  // PR-C: step 6 is the new terminal "自由探索" stage. Power
+  // users still use the progress dots to revisit earlier steps.
+  onboardingNext.disabled = onboarding.step >= 6;
   onboardingNext.textContent = onboarding.step === 4 ? '建立世界并演化 →' : '下一步 →';
-  onboardingProgressLabel.textContent = `第 ${onboarding.step} / 5 步`;
+  onboardingProgressLabel.textContent = `第 ${onboarding.step} / 6 步`;
+  // PR-C: 5a / 5b / 6 sub-pills — reflect current phase, lock
+  // pills the user hasn't earned yet, and update the "X / Y 日"
+  // progress label using the live `tick` from the worker.
+  updateStep5Substep(projection?.tick ?? 0);
   // The cosmos dialog has its own "进入当前生命星球" button
   // that lands on step 5; we wire that here so the user can
   // both arrive at step 5 from a "deeper" dialog AND jump to
@@ -1235,6 +1258,112 @@ function renderOnboarding() {
   const newWorldBtn = $('new-world');
   if (newWorldBtn) {
     newWorldBtn.onclick = () => { action(send('pause')); goToStep(4); };
+  }
+}
+
+/**
+ * PR-C: reflect the 5a / 5b / 6 sub-state in the sub-step
+ * pills, gate pills the user hasn't earned yet, and refresh
+ * the "X / Y 日" progress label. Pure render — no state
+ * mutation; the tick listener calls `maybeAutoAdvancePhase5`
+ * separately so we don't recursively re-render.
+ */
+function updateStep5Substep(tick: number): void {
+  const nav = $('step5-substep');
+  if (!nav) return;
+  // Hide the entire sub-step bar until the user reaches step 5
+  // (the sub-pills are a 5a/5b/6 thing, not a 1—4 thing).
+  nav.hidden = onboarding.step < 5;
+  if (nav.hidden) return;
+  const phase5aDone = step5aComplete(tick);
+  const phase5bDone = step5bComplete(tick);
+  const pills: Array<{ phase: Step5Phase; el: HTMLButtonElement | null; done: boolean; label: string }> = [
+    { phase: '5a', el: nav.querySelector<HTMLButtonElement>('[data-phase="5a"]'), done: phase5aDone, label: `${Math.min(tick, STEP_5A_DONE_TICK)} / ${STEP_5A_DONE_TICK} 日` },
+    { phase: '5b', el: nav.querySelector<HTMLButtonElement>('[data-phase="5b"]'), done: phase5bDone, label: `${Math.min(tick, STEP_5B_DONE_TICK)} / ${STEP_5B_DONE_TICK} 日` },
+    { phase: '6',  el: nav.querySelector<HTMLButtonElement>('[data-phase="6"]'),  done: phase5bDone, label: phase5bDone ? '已解锁' : '等待 5b 完成' },
+  ];
+  for (const p of pills) {
+    if (!p.el) continue;
+    p.el.setAttribute('aria-pressed', String(onboarding.step === 5 ? onboarding.phase5 === p.phase : onboarding.step === 6 && p.phase === '6'));
+    // 5a is always reachable; 5b unlocks once 5a is done; 6
+    // unlocks once 5b is done (or the user is already on 6).
+    p.el.disabled = !(
+      p.phase === '5a' ||
+      (p.phase === '5b' && phase5aDone) ||
+      (p.phase === '6' && phase5bDone) ||
+      onboarding.step === 6
+    );
+    const progress = p.el.querySelector<HTMLElement>('.step5-substep-progress');
+    if (progress) progress.textContent = p.label;
+  }
+}
+
+/**
+ * PR-C: tick listener that promotes the sub-state when the
+ * elapsed day count meets the step-5 thresholds. Idempotent —
+ * re-renders but does not loop because each branch clears the
+ * precondition before the next call.
+ */
+function maybeAutoAdvancePhase5(tick: number): void {
+  // Only meaningful once the user is on step 5 or step 6.
+  if (onboarding.step < 5) return;
+  if (onboarding.step === 6) return; // already terminal
+  // 5a → 5b
+  if (onboarding.phase5 === '5a' && step5aComplete(tick)) {
+    onboarding = setStep5Phase(onboarding, '5b');
+    persistOnboarding();
+    renderOnboarding();
+    toast(`已自动进入 5b(生命演化),阈值 ${STEP_5A_DONE_TICK} 日`);
+    return;
+  }
+  // 5b → 6 (自由探索)
+  if (onboarding.phase5 === '5b' && step5bComplete(tick)) {
+    onboarding = setStep5Phase(onboarding, '6');
+    onboarding = advanceOnboardingState(onboarding, 6);
+    persistOnboarding();
+    renderOnboarding();
+    toast(`已自动进入第 6 步「自由探索」,阈值 ${STEP_5B_DONE_TICK} 日`);
+  }
+}
+
+/**
+ * PR-C: pill click handlers. We bind once at module load —
+ * the buttons are stable elements that live in `<main>`'s
+ * static markup, so the listeners are never re-attached.
+ */
+function bindStep5SubstepHandlers(): void {
+  const nav = $('step5-substep');
+  if (!nav) return;
+  for (const pill of Array.from(nav.querySelectorAll<HTMLButtonElement>('.step5-substep-pill'))) {
+    const phase = pill.dataset.phase as Step5Phase | undefined;
+    if (!phase) continue;
+    pill.addEventListener('click', () => {
+      if (pill.disabled) return;
+      if (phase === '5a') {
+        // Re-entering 5a from 5b is allowed (lets the user
+        // re-watch the planet evolution). We keep `step = 5`
+        // and just flip the phase; the next tick will re-fire
+        // `maybeAutoAdvancePhase5` if the threshold is met.
+        if (onboarding.step === 6) {
+          // From step 6 the user can re-open 5a by stepping
+          // back to step 5 with phase 5a.
+          onboarding = advanceOnboardingState(onboarding, 5);
+        }
+        onboarding = setStep5Phase(onboarding, '5a');
+        persistOnboarding();
+        renderOnboarding();
+      } else if (phase === '5b') {
+        onboarding = setStep5Phase(onboarding, '5b');
+        persistOnboarding();
+        renderOnboarding();
+      } else if (phase === '6') {
+        onboarding = setStep5Phase(onboarding, '6');
+        onboarding = advanceOnboardingState(onboarding, 6);
+        persistOnboarding();
+        renderOnboarding();
+        toast('进入第 6 步「自由探索」');
+      }
+    });
   }
 }
 
@@ -1264,11 +1393,20 @@ onboardingPrev.addEventListener('click', () => {
   if (onboarding.step > 1) goToStep((onboarding.step - 1) as OnboardingStep);
 });
 onboardingNext.addEventListener('click', () => {
-  if (onboarding.step < 5) goToStep((onboarding.step + 1) as OnboardingStep);
+  if (onboarding.step < 6) goToStep((onboarding.step + 1) as OnboardingStep);
 });
+// PR-C: bind 5a/5b/6 sub-pill click handlers (5a re-entry,
+// 5b advance, 6 manual unlock). The pill DOM lives inside
+// `<main>` so it is stable across re-renders — listeners are
+// attached once at module load.
+bindStep5SubstepHandlers();
 onboardingReset.addEventListener('click', () => {
   if (!confirm('重置到第 1 步？已完成进度会清空。')) return;
-  onboarding = { step: 1, completedSteps: [], finishedAtMs: null };
+  // PR-C: phase5 also resets to 5a so the user re-walks the
+  // 5a/5b/6 ladder; otherwise an old `phase5 = '6'` from a
+  // previous wizard would be retained across a reset, which
+  // is misleading.
+  onboarding = { step: 1, phase5: '5a', completedSteps: [], finishedAtMs: null };
   // PR-A: also clear the boot choice so the next cold start
   // re-asks "你是哪种读者?" rather than auto-resuming a
   // role that the user explicitly just reset past.

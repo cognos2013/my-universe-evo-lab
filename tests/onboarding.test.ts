@@ -28,6 +28,11 @@ import {
   STEP_META,
   STEP_COMPLETION,
   nextStepAfterCompletion,
+  setStep5Phase,
+  step5aComplete,
+  step5bComplete,
+  STEP_5A_DONE_TICK,
+  STEP_5B_DONE_TICK,
   ALL_ONBOARDING_STEPS,
   ALL_ROLES,
   ROLE_META,
@@ -36,6 +41,7 @@ import {
   type OnboardingState,
   type OnboardingStep,
   type BootChoice,
+  type Step5Phase,
 } from '../src/app/onboarding.ts';
 
 // === Storage shim ====================================================
@@ -78,6 +84,7 @@ test('save → load round-trip preserves all three fields', () => {
   try {
     const original: OnboardingState = {
       step: 3,
+      phase5: '5a',
       completedSteps: [1, 2],
       finishedAtMs: null,
     };
@@ -115,43 +122,46 @@ test('unknown fields in stored JSON are dropped', () => {
 });
 
 test('advanceOnboardingState is idempotent on the same step', () => {
-  const s0: OnboardingState = { step: 2, completedSteps: [1], finishedAtMs: null };
+  const s0: OnboardingState = { step: 2, phase5: '5a', completedSteps: [1], finishedAtMs: null };
   const s1 = advanceOnboardingState(s0, 2);
   assert.equal(s1.step, 2);
   assert.deepEqual(s1.completedSteps, [1]);
 });
 
 test('advanceOnboardingState marks every step ≤ target as completed', () => {
-  const s0: OnboardingState = { step: 1, completedSteps: [], finishedAtMs: null };
+  const s0: OnboardingState = { step: 1, phase5: '5a', completedSteps: [], finishedAtMs: null };
   const s3 = advanceOnboardingState(s0, 3);
   assert.equal(s3.step, 3);
   assert.deepEqual(s3.completedSteps, [1, 2, 3]);
 });
 
-test('advanceOnboardingState(5) stamps finishedAtMs the first time', () => {
-  const s0: OnboardingState = { step: 1, completedSteps: [], finishedAtMs: null };
-  const s5 = advanceOnboardingState(s0, 5);
-  assert.equal(s5.step, 5);
-  assert.equal(s5.finishedAtMs !== null, true);
+test('advanceOnboardingState(6) stamps finishedAtMs the first time', () => {
+  // PR-C: step 5 is no longer the "finished" marker — that's
+  // now reserved for step 6 (自由探索). Reaching step 5 alone
+  // does not mean the user has finished the wizard.
+  const s0: OnboardingState = { step: 1, phase5: '5a', completedSteps: [], finishedAtMs: null };
+  const s6 = advanceOnboardingState(s0, 6);
+  assert.equal(s6.step, 6);
+  assert.equal(s6.finishedAtMs !== null, true);
   // Advancing again does NOT overwrite the original finish time.
-  const s5Again = advanceOnboardingState(s5, 5);
-  assert.equal(s5Again.finishedAtMs, s5.finishedAtMs);
+  const s6Again = advanceOnboardingState(s6, 6);
+  assert.equal(s6Again.finishedAtMs, s6.finishedAtMs);
 });
 
 test('isStepReachable: target == current is always reachable', () => {
-  const s: OnboardingState = { step: 3, completedSteps: [1, 2], finishedAtMs: null };
+  const s: OnboardingState = { step: 3, phase5: '5a', completedSteps: [1, 2], finishedAtMs: null };
   assert.equal(isStepReachable(s, 3), true);
 });
 
 test('isStepReachable: target in completedSteps is reachable', () => {
-  const s: OnboardingState = { step: 4, completedSteps: [1, 2, 3], finishedAtMs: null };
+  const s: OnboardingState = { step: 4, phase5: '5a', completedSteps: [1, 2, 3], finishedAtMs: null };
   assert.equal(isStepReachable(s, 1), true);
   assert.equal(isStepReachable(s, 2), true);
   assert.equal(isStepReachable(s, 3), true);
 });
 
 test('isStepReachable: skipping ahead is blocked when not yet completed', () => {
-  const s: OnboardingState = { step: 1, completedSteps: [], finishedAtMs: null };
+  const s: OnboardingState = { step: 1, phase5: '5a', completedSteps: [], finishedAtMs: null };
   assert.equal(isStepReachable(s, 3), false);
   assert.equal(isStepReachable(s, 5), false);
   // But the immediate next step is reachable.
@@ -159,7 +169,7 @@ test('isStepReachable: skipping ahead is blocked when not yet completed', () => 
 });
 
 test('isStepReachable: a state with completedSteps 1—3 lets the user click 4 but not 5', () => {
-  const s: OnboardingState = { step: 3, completedSteps: [1, 2, 3], finishedAtMs: null };
+  const s: OnboardingState = { step: 3, phase5: '5a', completedSteps: [1, 2, 3], finishedAtMs: null };
   assert.equal(isStepReachable(s, 4), true);
   assert.equal(isStepReachable(s, 5), false);
 });
@@ -178,8 +188,8 @@ test('STEP_META covers all 5 steps with required fields', () => {
   }
 });
 
-test('ALL_ONBOARDING_STEPS lists 1—5 in order', () => {
-  assert.deepEqual([...ALL_ONBOARDING_STEPS], [1, 2, 3, 4, 5]);
+test('ALL_ONBOARDING_STEPS lists 1—6 in order (PR-C added step 6)', () => {
+  assert.deepEqual([...ALL_ONBOARDING_STEPS], [1, 2, 3, 4, 5, 6]);
 });
 
 // === PR-A: Boot choice (role / skipBasics) ===========================
@@ -290,11 +300,15 @@ test('ROLE_META covers every role with non-empty fields', () => {
 
 // === PR-B: completion-criterion hooks ==============================
 
-test('STEP_COMPLETION maps every step 1—5 to either a panel + next step or terminal', () => {
+test('STEP_COMPLETION maps every step 1—6 to either a panel + next step or terminal', () => {
   for (const step of ALL_ONBOARDING_STEPS) {
     const entry = STEP_COMPLETION[step];
     assert.ok(entry, `step ${step} must have a completion entry`);
-    if (step === 5) {
+    if (step === 5 || step === 6) {
+      // PR-C: step 5 is now broken into 5a/5b/6 (tick-driven);
+      // step 6 is the final "自由探索" terminal. Neither has a
+      // single auto-advance panel because the ladder is now
+      // tick-driven, not dialog-driven.
       assert.equal(entry.panel, null);
       assert.equal(entry.nextStep, null);
     } else {
@@ -342,10 +356,126 @@ test('advanceOnboardingState marks prior steps as completed when advancing', () 
 });
 
 test('advanceOnboardingState preserves the prior finishedAtMs across subsequent steps', () => {
-  // Reaching step 5 sets finishedAtMs. Jumping back to step 3
-  // (e.g. via the progress bar) must not clear it.
+  // Reaching step 6 sets finishedAtMs (PR-C moved the marker
+  // from step 5 to step 6 so the user can roam 5a/5b without
+  // being "done"). Jumping back to step 3 must not clear it.
+  const reached6 = advanceOnboardingState(DEFAULT_ONBOARDING_STATE, 6);
+  assert.ok(reached6.finishedAtMs !== null);
+  const back = advanceOnboardingState(reached6, 3);
+  assert.equal(back.finishedAtMs, reached6.finishedAtMs);
+});
+
+// === PR-C: 6-step wizard + 5a/5b/6 sub-phase ===========================
+
+test('PR-C: OnboardingStep now includes 6 (free explore)', () => {
+  // Compile-time guard: this assignment only succeeds if `6`
+  // is a valid `OnboardingStep` literal.
+  const six: OnboardingStep = 6;
+  assert.equal(six, 6);
+  assert.ok((ALL_ONBOARDING_STEPS as readonly OnboardingStep[]).includes(6));
+});
+
+test('PR-C: DEFAULT_ONBOARDING_STATE seeds phase5 = "5a"', () => {
+  assert.equal(DEFAULT_ONBOARDING_STATE.phase5, '5a');
+});
+
+test('PR-C: advanceOnboardingState sets finishedAtMs only at step 6 (not step 5)', () => {
+  // Step 5 used to set finishedAtMs in the old design; PR-C
+  // moves that marker to step 6 so reaching step 5b (without
+  // finishing 6) does not mark the wizard as "done".
   const reached5 = advanceOnboardingState(DEFAULT_ONBOARDING_STATE, 5);
-  assert.ok(reached5.finishedAtMs !== null);
-  const back = advanceOnboardingState(reached5, 3);
-  assert.equal(back.finishedAtMs, reached5.finishedAtMs);
+  assert.equal(reached5.finishedAtMs, null);
+  const reached6 = advanceOnboardingState(reached5, 6);
+  assert.ok(reached6.finishedAtMs !== null);
+});
+
+test('PR-C: advanceOnboardingState to step 5 resets phase5 to "5a"', () => {
+  // Pre-condition: a state in 5b — entering step 5 again
+  // (via the progress bar) must reset the sub-phase so the
+  // user re-walks 5a → 5b → 6, instead of jumping to whatever
+  // they last left.
+  const mid = { ...DEFAULT_ONBOARDING_STATE, step: 6 as OnboardingStep, phase5: '6' as Step5Phase };
+  const back5 = advanceOnboardingState(mid, 5);
+  assert.equal(back5.phase5, '5a');
+});
+
+test('PR-C: advanceOnboardingState preserves phase5 when leaving step 5 sideways', () => {
+  // Going from step 5 (5b) to step 4 must keep the phase5
+  // string around so a quick back-and-forth doesn't drop the
+  // user's progress through the 5a/5b ladder.
+  const mid: OnboardingState = { ...DEFAULT_ONBOARDING_STATE, step: 5, phase5: '5b' };
+  const back4 = advanceOnboardingState(mid, 4);
+  assert.equal(back4.phase5, '5b');
+  // Coming forward again to step 5 — we DO reset to 5a (the
+  // test above covers that branch), but the prior `phase5`
+  // is the source of truth for the back-step.
+});
+
+test('PR-C: setStep5Phase is idempotent (returns same shape on no-op)', () => {
+  const s = { ...DEFAULT_ONBOARDING_STATE, step: 5 as OnboardingStep, phase5: '5b' as Step5Phase };
+  const same = setStep5Phase(s, '5b');
+  assert.equal(same.phase5, '5b');
+  // Reference should be unchanged for the no-op case so the
+  // renderOnboarding caller doesn't waste a re-render.
+  assert.equal(same, s);
+});
+
+test('PR-C: setStep5Phase accepts 5a / 5b / 6 only', () => {
+  const s: OnboardingState = { ...DEFAULT_ONBOARDING_STATE, step: 5 as OnboardingStep, phase5: '5a' as Step5Phase };
+  assert.equal(setStep5Phase(s, '5b').phase5, '5b');
+  assert.equal(setStep5Phase(s, '6').phase5, '6');
+  // Type system would reject any other string at compile time;
+  // runtime is permissive (sanitise does the real check).
+});
+
+test('PR-C: step5aComplete respects the default threshold', () => {
+  assert.equal(step5aComplete(0), false);
+  assert.equal(step5aComplete(STEP_5A_DONE_TICK - 1), false);
+  assert.equal(step5aComplete(STEP_5A_DONE_TICK), true);
+  assert.equal(step5aComplete(STEP_5A_DONE_TICK + 1), true);
+});
+
+test('PR-C: step5bComplete respects the default threshold', () => {
+  assert.equal(step5bComplete(0), false);
+  assert.equal(step5bComplete(STEP_5B_DONE_TICK - 1), false);
+  assert.equal(step5bComplete(STEP_5B_DONE_TICK), true);
+  assert.equal(step5bComplete(STEP_5B_DONE_TICK + 5000), true);
+});
+
+test('PR-C: step5a/step5b honour a custom threshold (学段适配 future-proofing)', () => {
+  // PR-F can lower these for `elementary`; the helpers must
+  // accept an override rather than baking STEP_*_DONE_TICK in.
+  assert.equal(step5aComplete(50, 50), true);
+  assert.equal(step5bComplete(500, 500), true);
+  assert.equal(step5aComplete(99, 100), false);
+  assert.equal(step5bComplete(499, 500), false);
+});
+
+test('PR-C: loadOnboardingState sanitises phase5 from arbitrary JSON', () => {
+  installStorageShim();
+  try {
+    shim.data.set('my-universe-onboarding-v1', JSON.stringify({
+      step: 5, phase5: '5b', completedSteps: [1, 2, 3, 4], finishedAtMs: null,
+    }));
+    const back = loadOnboardingState();
+    assert.equal(back.step, 5);
+    assert.equal(back.phase5, '5b');
+    assert.deepEqual(back.completedSteps, [1, 2, 3, 4]);
+  } finally { restoreStorage(); }
+});
+
+test('PR-C: loadOnboardingState defaults phase5 to "5a" when missing or invalid', () => {
+  installStorageShim();
+  try {
+    // Missing phase5 entirely.
+    shim.data.set('my-universe-onboarding-v1', JSON.stringify({
+      step: 5, completedSteps: [1, 2, 3, 4], finishedAtMs: null,
+    }));
+    assert.equal(loadOnboardingState().phase5, '5a');
+    // Garbage phase5 falls back to the default.
+    shim.data.set('my-universe-onboarding-v1', JSON.stringify({
+      step: 5, phase5: 'junk', completedSteps: [], finishedAtMs: null,
+    }));
+    assert.equal(loadOnboardingState().phase5, '5a');
+  } finally { restoreStorage(); }
 });
