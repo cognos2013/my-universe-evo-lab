@@ -27,6 +27,39 @@ export type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 export const ALL_ONBOARDING_STEPS: readonly OnboardingStep[] = [1, 2, 3, 4, 5] as const;
 
 /**
+ * PR-B — completion-criterion hooks.
+ *
+ * Each step 1—4 has an associated *completion action* (the
+ * physical thing the user has to do, not just "look at the
+ * panel"). When the app observes that action, it marks the
+ * step as completed and (optionally) auto-advances to the
+ * next one. This is the function-of-action completion
+ * criterion the user requested in the design review —
+ * the previous behaviour only flipped `step` to 5 directly,
+ * so scenarios 2 and 3 looked identical.
+ *
+ * The mapping lives here, not in `main.ts`, so PR-F (学段适配)
+ * can override the wiring without spelunking the main bundle.
+ */
+export const STEP_COMPLETION: Record<OnboardingStep, { panel: string | null; nextStep: OnboardingStep | null }> = {
+  1: { panel: 'cosmos',  nextStep: 2 },     // step 1 → 看宇宙背景
+  2: { panel: 'galaxy',  nextStep: 3 },     // step 2 → 看星系演化
+  3: { panel: 'v14',     nextStep: 4 },     // step 3 → 选恒星系统
+  4: { panel: 'create',  nextStep: 5 },     // step 4 → 初始化行星(走 form submit 路径)
+  5: { panel: null,      nextStep: null },  // step 5 = 演化,不再 auto-advance
+};
+
+/**
+ * Pure helper: given the current step, return the step the
+ * user should land on after they complete the *completion
+ * action* for that step. Returns `null` when the step is
+ * terminal (step 5) or the action does not auto-advance.
+ */
+export function nextStepAfterCompletion(step: OnboardingStep): OnboardingStep | null {
+  return STEP_COMPLETION[step].nextStep;
+}
+
+/**
  * PR-A — Boot choice (role / skipBasics).
  *
  * The cold-start onboarding now begins with a *role* selection so

@@ -26,6 +26,8 @@ import {
   saveBootChoice,
   clearBootChoice,
   STEP_META,
+  STEP_COMPLETION,
+  nextStepAfterCompletion,
   ALL_ONBOARDING_STEPS,
   ALL_ROLES,
   ROLE_META,
@@ -284,4 +286,66 @@ test('ROLE_META covers every role with non-empty fields', () => {
     assert.equal(typeof meta.audience, 'string');
     assert.ok(meta.audience.length > 0);
   }
+});
+
+// === PR-B: completion-criterion hooks ==============================
+
+test('STEP_COMPLETION maps every step 1—5 to either a panel + next step or terminal', () => {
+  for (const step of ALL_ONBOARDING_STEPS) {
+    const entry = STEP_COMPLETION[step];
+    assert.ok(entry, `step ${step} must have a completion entry`);
+    if (step === 5) {
+      assert.equal(entry.panel, null);
+      assert.equal(entry.nextStep, null);
+    } else {
+      assert.equal(typeof entry.panel, 'string');
+      assert.ok(entry.panel!.length > 0);
+      assert.ok(entry.nextStep !== null, `step ${step} must auto-advance`);
+      assert.ok((ALL_ONBOARDING_STEPS as readonly number[]).includes(entry.nextStep as number));
+      // The completion step must move the user forward, not backward.
+      assert.ok((entry.nextStep as number) > step);
+    }
+  }
+});
+
+test('nextStepAfterCompletion mirrors STEP_COMPLETION.nextStep', () => {
+  for (const step of ALL_ONBOARDING_STEPS) {
+    assert.equal(nextStepAfterCompletion(step), STEP_COMPLETION[step].nextStep);
+  }
+});
+
+test('nextStepAfterCompletion returns null for the terminal step', () => {
+  assert.equal(nextStepAfterCompletion(5), null);
+});
+
+test('nextStepAfterCompletion moves 1 → 2 → 3 → 4 → 5 in sequence', () => {
+  // Walking through the wizard, each step should hand off to
+  // the next one. This is the chain `maybeAdvanceFromExploreClose`
+  // follows at runtime.
+  const path: OnboardingStep[] = [1];
+  let cur: OnboardingStep = 1;
+  while (true) {
+    const next = nextStepAfterCompletion(cur);
+    if (next === null) break;
+    path.push(next);
+    cur = next;
+  }
+  assert.deepEqual(path, [1, 2, 3, 4, 5]);
+});
+
+test('advanceOnboardingState marks prior steps as completed when advancing', () => {
+  // Simulate the user closing the cosmos panel after step 1.
+  const after1 = advanceOnboardingState(DEFAULT_ONBOARDING_STATE, 2);
+  assert.ok(after1.completedSteps.includes(1));
+  assert.ok(after1.completedSteps.includes(2));
+  assert.equal(after1.step, 2);
+});
+
+test('advanceOnboardingState preserves the prior finishedAtMs across subsequent steps', () => {
+  // Reaching step 5 sets finishedAtMs. Jumping back to step 3
+  // (e.g. via the progress bar) must not clear it.
+  const reached5 = advanceOnboardingState(DEFAULT_ONBOARDING_STATE, 5);
+  assert.ok(reached5.finishedAtMs !== null);
+  const back = advanceOnboardingState(reached5, 3);
+  assert.equal(back.finishedAtMs, reached5.finishedAtMs);
 });

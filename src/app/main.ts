@@ -15,6 +15,9 @@ import {
   saveBootChoice,
   clearBootChoice,
   ALL_ROLES,
+  ROLE_META,
+  STEP_COMPLETION,
+  nextStepAfterCompletion,
   type OnboardingStep,
   type Role,
   type BootChoice,
@@ -322,11 +325,53 @@ function activateExplore(id: ExplorePanelId | null) {
       const section = document.getElementById(sectionId);
       if (section) section.hidden = true;
     }
+    // PR-B: closing an explore panel can also complete a wizard
+    // step. We track which panel was last opened (via the
+    // `id !== null` branch below) and, if it matches the
+    // "completion action" for the current step, advance to the
+    // next step. The user can still press the "下一步 →" button
+    // by hand, so this is purely additive.
+    maybeAdvanceFromExploreClose();
   } else {
     if (mainEl) mainEl.hidden = true;
     exploreStage.hidden = false;
     mountExplorePanel(id);
+    // Remember the panel we just opened so the close path can
+    // decide whether to advance the wizard.
+    lastExplorePanel = id;
   }
+}
+
+/**
+ * PR-B: track the most recently opened explore panel so the
+ * close path can correlate it with the current onboarding step.
+ * `null` when no panel is active or after a cold start.
+ */
+let lastExplorePanel: ExplorePanelId | null = null;
+
+function maybeAdvanceFromExploreClose(): void {
+  if (lastExplorePanel === null) return;
+  // Only handle wizard steps 1—4. Step 5 is the "演化" stage,
+  // where closing the explore sidebar must NOT teleport the
+  // user anywhere — they're already on the terminal step.
+  if (onboarding.step < 1 || onboarding.step > 4) {
+    lastExplorePanel = null;
+    return;
+  }
+  const expectedPanel = STEP_COMPLETION[onboarding.step].panel;
+  if (expectedPanel !== lastExplorePanel) {
+    lastExplorePanel = null;
+    return;
+  }
+  const next = nextStepAfterCompletion(onboarding.step);
+  lastExplorePanel = null;
+  if (next === null) return;
+  // `goToStep` already calls `advanceOnboardingState` so the
+  // current step is marked completed; we then advance to `next`.
+  goToStep(next);
+  // Briefly signal that the wizard auto-progressed, so the
+  // user understands why the hero card changed.
+  toast(`已自动进入第 ${next} 步`);
 }
 exploreBackBtn.addEventListener('click', () => activateExplore(null));
 exploreRecommendBtn.addEventListener('click', () => {
@@ -949,14 +994,37 @@ $('seek').addEventListener('change',()=>{$('cancel-history').hidden=false;action
 $('cancel-history').addEventListener('click',()=>action(send('pause')));
 $('cancel-operation').addEventListener('click',()=>action(send('pause')));
 $('seek').addEventListener('input',()=>{$('seek-label').textContent=`第 ${$<HTMLInputElement>('seek').value} 日`;});
-async function start(){
-  try{const saved=await store.latest();if(saved){await send('import',{content:saved.content});lastSavedTick=projection?.tick??0;lastSavedBranch=projection?.branchId??'';$('save-status').textContent=`已恢复 · 第 ${lastSavedTick} 日`;onboarding=advanceOnboardingState(onboarding,5);persistOnboarding();renderOnboarding();await loadCellCenters();return;}}
+/**
+ * Start (or restore) the planet simulation. The caller decides
+ * which onboarding `step` the user should land on — `5` is the
+ * legacy "skip the wizard, go straight to the evolve screen"
+ * used by the restore path, while the boot modal hands the user
+ * over to `start(1)` or `start(4)` depending on the role and
+ * the `skipBasics` flag.
+ *
+ * We split this from `start()` so the boot modal can pick the
+ * right step without changing the existing restore behaviour.
+ */
+function decideBootInitialStep(boot: BootChoice): OnboardingStep {
+  // Elementary students always walk the full 5 steps — they
+  // need the cosmos backdrop to make "一颗星球" land.
+  if (boot.role === 'elementary') return 1;
+  // Middle / high / teacher: only skip to step 4 if the user
+  // explicitly ticked "跳过基础". Otherwise stay on step 1 so
+  // the wizard teaches them cosmos → galaxy → star → planet.
+  return boot.skipBasics ? 4 : 1;
+}
+
+async function start(initialStep: OnboardingStep = 5){
+  try{const saved=await store.latest();if(saved){await send('import',{content:saved.content});lastSavedTick=projection?.tick??0;lastSavedBranch=projection?.branchId??'';$('save-status').textContent=`已恢复 · 第 ${lastSavedTick} 日`;onboarding=advanceOnboardingState(onboarding,initialStep);persistOnboarding();renderOnboarding();await loadCellCenters();return;}}
   catch(error){autoEnabled=false;toast(`无法恢复本地存档，已保留原文件：${error instanceof Error?error.message:String(error)}`,'error');}
   await send('create',{scenario:'two-lineages',cells:5120});
-  // Cold start with no saved world: jump to step 5 (the planet
-  // already exists, so the wizard has done its job). The
-  // user can still click the progress bar to revisit step 1—4.
-  onboarding=advanceOnboardingState(onboarding,5);persistOnboarding();renderOnboarding();
+  // Cold start: respect the caller's choice of initial step.
+  // When the boot modal routes us here with `1` or `4`, the
+  // user sees the wizard from that point instead of being
+  // teleported to the evolve screen. The default `5` keeps
+  // the legacy "no boot choice, just run it" behaviour.
+  onboarding=advanceOnboardingState(onboarding,initialStep);persistOnboarding();renderOnboarding();
   // P3.6 — also fetch the cell-centre lookup. Without this,
   // skipping the create form (e.g. by clicking the step-5 dot
   // directly) leaves cellCentersCache null, and the first
@@ -1025,12 +1093,23 @@ bootStartBtn.addEventListener('click', () => {
   };
   saveBootChoice(choice);
   hideBootModal();
-  // Kick off the planet simulation now that we know who we're
-  // talking to. We don't act on `role` yet — PR-F (学段适配)
-  // wires the role into step wording + recommendation strength.
-  // The `skipBasics` flag is also dormant for now: PR-B wires
-  // it into the initial `OnboardingState.step`.
-  action(start());
+  // Hand the user off to the wizard at the right step. Without
+  // this, `start()` would default to step 5 (the evolve screen)
+  // and the role + skipBasics choice would have no visible
+  // effect — making scenarios 2 and 3 look identical. The
+  // decideBootInitialStep helper codifies the PR-A wiring so
+  // PR-B / PR-F can override the logic in one place later.
+  const initialStep = decideBootInitialStep(choice);
+  // Briefly show a toast so the user gets a visible signal that
+  // their choice was honoured — this is the "minimum visible
+  // difference" between scenario 2 (no skip) and 3 (skip) the
+  // user asked for.
+  if (choice.skipBasics) {
+    toast('已跳过宇宙/星系/恒星阶段,直接进入建立行星');
+  } else {
+    toast(`欢迎,${ROLE_META[choice.role].label}!从「宇宙」开始`);
+  }
+  action(start(initialStep));
 });
 
 if (loadBootChoice() === null) {
@@ -1207,9 +1286,17 @@ for (const skip of Array.from(document.querySelectorAll<HTMLButtonElement>('.onb
   else if (actionName === 'galaxies') skip.addEventListener('click', () => activateExplore('galaxy'));
   else if (actionName === 'create') skip.addEventListener('click', () => { action(send('pause')); goToStep(4); });
 }
-document.getElementById('onboarding-cta-1')!.addEventListener('click', () => { goToStep(5); activateExplore('cosmos'); });
-document.getElementById('onboarding-cta-2')!.addEventListener('click', () => { goToStep(5); activateExplore('galaxy'); });
-document.getElementById('onboarding-cta-3')!.addEventListener('click', () => { goToStep(5); activateExplore('v14'); });
+// PR-B: CTAs no longer teleport to step 5. They open the
+// matching explore panel; when the user closes that panel
+// (via the back button, ESC, or any in-panel close control),
+// `maybeAdvanceFromExploreClose` (wired inside `activateExplore`)
+// auto-advances the wizard to the next step. This is the
+// "function-of-action" completion criterion the user asked
+// for in the design review — visiting a step's panel is the
+// proof of completion, not a separate "完成" click.
+document.getElementById('onboarding-cta-1')!.addEventListener('click', () => activateExplore('cosmos'));
+document.getElementById('onboarding-cta-2')!.addEventListener('click', () => activateExplore('galaxy'));
+document.getElementById('onboarding-cta-3')!.addEventListener('click', () => activateExplore('v14'));
 // Cross-panel navigation: any "open another panel" button
 // inside a panel dispatches `explore-activate` with the new
 // panel id. The host listens and updates the stage. This is
